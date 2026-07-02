@@ -1,0 +1,21 @@
+{
+  "short_name": "FlourishCare",
+  "name": "FlourishCare — Rumah Tumbuh Kembang Digital",
+  "icons": [
+    {
+      "src": "https://images.unsplash.com/photo-1596464716127-f2a82984de30?q=80&w=192&h=192&fit=crop",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "https://images.unsplash.com/photo-1596464716127-f2a82984de30?q=80&w=512&h=512&fit=crop",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#FFFBF7",
+  "theme_color": "#FF9838",
+  "display": "standalone",
+  "orientation": "portrait"
+}

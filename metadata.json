@@ -1,0 +1,6 @@
+{
+  "name": "FlourishCare App",
+  "description": "Companion tumbuh kembang anak (0-7 tahun) terintegrasi dengan klinik terapi & psikolog FlourishCare.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
