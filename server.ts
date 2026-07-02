@@ -1,7 +1,12 @@
+import dotenv from 'dotenv';
+// Load environment variables before any other imports/initializations
+dotenv.config();
+
 import express, { Request, Response } from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
+import { createClient } from '@supabase/supabase-js';
 import { 
   UserProfile, 
   Child, 
@@ -14,6 +19,21 @@ import {
   Notification, 
   NotificationPreferences 
 } from './src/types';
+
+// Initialize Supabase Client safely with provided details
+const rawSupabaseUrl = process.env.SUPABASE_URL || 'https://vtquhqdfyirccxdzmpyr.supabase.co';
+// Clean raw URL: strip trailing /rest/v1 or /rest/v1/ suffix if present
+const SUPABASE_URL = rawSupabaseUrl.replace(/\/rest\/v1\/?$/, '');
+const SUPABASE_KEY = process.env.SUPABASE_KEY || 'sb_publishable_rV4ay28GgXdI3TgnY3jkJA_YIVVJAKS';
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+function isTableMissingError(err: any): boolean {
+  if (!err) return false;
+  const msg = (err.message || String(err)).toLowerCase();
+  const code = err.code || '';
+  return code === '42P01' || msg.includes('could not find the table') || msg.includes('relation') || msg.includes('does not exist');
+}
 
 // Initialize Gemini Client safely
 let ai: GoogleGenAI | null = null;
@@ -211,28 +231,617 @@ const PORT = 3000;
   };
 
   // ==========================================
+  // SUPABASE DATABASE DATA-ACCESS WRAPPERS
+  // ==========================================
+
+  async function getProfile(): Promise<UserProfile> {
+    try {
+      const { data, error } = await supabase.from('app_profiles').select('*').eq('id', 'u_amanda').single();
+      if (error) {
+        if (error.code === 'PGRST116') {
+          console.log('Profile "u_amanda" not found in Supabase. Auto-seeding default profile...');
+          await updateProfile(activeProfile);
+          return activeProfile;
+        }
+        throw error;
+      }
+      if (data) {
+        return {
+          id: data.id,
+          fullName: data.full_name,
+          phoneWhatsapp: data.phone_whatsapp || '',
+          email: data.email || '',
+          city: data.city || '',
+          role: data.role as 'parent' | 'caregiver',
+          createdAt: data.created_at
+        };
+      }
+    } catch (err: any) {
+      if (isTableMissingError(err)) {
+        console.log('Supabase table app_profiles is not setup yet, using local memory storage.');
+      } else {
+        console.warn('Supabase getProfile failed, using memory fallback:', err.message || err);
+      }
+    }
+    return activeProfile;
+  }
+
+  async function updateProfile(update: Partial<UserProfile>): Promise<UserProfile> {
+    activeProfile = { ...activeProfile, ...update };
+    try {
+      await supabase.from('app_profiles').upsert({
+        id: 'u_amanda',
+        full_name: activeProfile.fullName,
+        phone_whatsapp: activeProfile.phoneWhatsapp,
+        email: activeProfile.email,
+        city: activeProfile.city,
+        role: activeProfile.role,
+      });
+    } catch (err: any) {
+      console.warn('Supabase updateProfile failed, updated memory only:', err.message || err);
+    }
+    return activeProfile;
+  }
+
+  async function getChildren(): Promise<Child[]> {
+    try {
+      const { data, error } = await supabase.from('app_children').select('*').eq('parent_id', 'u_amanda');
+      if (error) throw error;
+      if (data && data.length > 0) {
+        return data.map(item => ({
+          id: item.id,
+          parentId: item.parent_id,
+          name: item.name,
+          birthDate: item.birth_date,
+          expectedDueDate: item.expected_due_date,
+          gender: item.gender as 'L' | 'P',
+          photoUrl: item.photo_url,
+          isPremature: item.is_premature,
+          medicalNotes: item.medical_notes,
+          createdAt: item.created_at
+        }));
+      }
+    } catch (err: any) {
+      if (isTableMissingError(err)) {
+        console.log('Supabase table app_children is not setup yet, using local memory storage.');
+      } else {
+        console.warn('Supabase getChildren failed, using memory fallback:', err.message || err);
+      }
+    }
+    return children;
+  }
+
+  async function saveChild(child: Child): Promise<void> {
+    const existingIndex = children.findIndex(c => c.id === child.id);
+    if (existingIndex !== -1) {
+      children[existingIndex] = child;
+    } else {
+      children.push(child);
+    }
+    try {
+      await supabase.from('app_children').upsert({
+        id: child.id,
+        parent_id: child.parentId,
+        name: child.name,
+        birth_date: child.birthDate,
+        expected_due_date: child.expectedDueDate,
+        gender: child.gender,
+        photo_url: child.photoUrl,
+        is_premature: child.isPremature,
+        medical_notes: child.medicalNotes,
+        created_at: child.createdAt
+      });
+    } catch (err: any) {
+      console.warn('Supabase saveChild failed, updated memory only:', err.message || err);
+    }
+  }
+
+  async function deleteChild(childId: string): Promise<void> {
+    children = children.filter(c => c.id !== childId);
+    growthRecords = growthRecords.filter(g => g.childId !== childId);
+    childMilestones = childMilestones.filter(m => m.childId !== childId);
+    childImmunizations = childImmunizations.filter(i => i.childId !== childId);
+    screenings = screenings.filter(s => s.childId !== childId);
+
+    try {
+      await supabase.from('app_children').delete().eq('id', childId);
+    } catch (err: any) {
+      console.warn('Supabase deleteChild failed, updated memory only:', err.message || err);
+    }
+  }
+
+  async function getGrowthRecords(childId: string): Promise<GrowthRecord[]> {
+    try {
+      const { data, error } = await supabase.from('app_growth_records').select('*').eq('child_id', childId);
+      if (error) throw error;
+      if (data && data.length > 0) {
+        return data.map(item => ({
+          id: item.id,
+          childId: item.child_id,
+          date: item.date,
+          weightKg: Number(item.weight_kg),
+          heightCm: Number(item.height_cm),
+          headCircumferenceCm: Number(item.head_circumference_cm),
+          notes: item.notes,
+          createdAt: item.created_at
+        })).sort((a,b) => a.date.localeCompare(b.date));
+      }
+    } catch (err: any) {
+      if (isTableMissingError(err)) {
+        console.log('Supabase table app_growth_records is not setup yet, using local memory storage.');
+      } else {
+        console.warn('Supabase getGrowthRecords failed, using memory fallback:', err.message || err);
+      }
+    }
+    return growthRecords.filter(g => g.childId === childId).sort((a,b) => a.date.localeCompare(b.date));
+  }
+
+  async function saveGrowthRecord(record: GrowthRecord): Promise<void> {
+    growthRecords.push(record);
+    try {
+      await supabase.from('app_growth_records').insert({
+        id: record.id,
+        child_id: record.childId,
+        date: record.date,
+        weight_kg: record.weightKg,
+        height_cm: record.heightCm,
+        head_circumference_cm: record.headCircumferenceCm,
+        notes: record.notes,
+        created_at: record.createdAt
+      });
+    } catch (err: any) {
+      console.warn('Supabase saveGrowthRecord failed, updated memory only:', err.message || err);
+    }
+  }
+
+  async function deleteGrowthRecord(id: string): Promise<void> {
+    growthRecords = growthRecords.filter(g => g.id !== id);
+    try {
+      await supabase.from('app_growth_records').delete().eq('id', id);
+    } catch (err: any) {
+      console.warn('Supabase deleteGrowthRecord failed, updated memory only:', err.message || err);
+    }
+  }
+
+  async function getChildMilestones(childId: string): Promise<ChildMilestone[]> {
+    try {
+      const { data, error } = await supabase.from('app_child_milestones').select('*').eq('child_id', childId);
+      if (error) throw error;
+      if (data && data.length > 0) {
+        return data.map(item => ({
+          id: item.id,
+          childId: item.child_id,
+          milestoneId: item.milestone_id,
+          achieved: item.achieved,
+          achievedDate: item.achieved_date,
+          createdAt: item.created_at
+        }));
+      }
+    } catch (err: any) {
+      if (isTableMissingError(err)) {
+        console.log('Supabase table app_child_milestones is not setup yet, using local memory storage.');
+      } else {
+        console.warn('Supabase getChildMilestones failed, using memory fallback:', err.message || err);
+      }
+    }
+    return childMilestones.filter(m => m.childId === childId);
+  }
+
+  async function saveChildMilestone(m: ChildMilestone): Promise<void> {
+    const existingIdx = childMilestones.findIndex(item => item.childId === m.childId && item.milestoneId === m.milestoneId);
+    if (existingIdx !== -1) {
+      childMilestones[existingIdx] = m;
+    } else {
+      childMilestones.push(m);
+    }
+    try {
+      await supabase.from('app_child_milestones').upsert({
+        id: m.id,
+        child_id: m.childId,
+        milestone_id: m.milestoneId,
+        achieved: m.achieved,
+        achieved_date: m.achievedDate,
+        created_at: m.createdAt
+      });
+    } catch (err: any) {
+      console.warn('Supabase saveChildMilestone failed, updated memory only:', err.message || err);
+    }
+  }
+
+  async function deleteChildMilestone(childId: string, milestoneId: string): Promise<void> {
+    childMilestones = childMilestones.filter(item => !(item.childId === childId && item.milestoneId === milestoneId));
+    try {
+      await supabase.from('app_child_milestones').delete().eq('child_id', childId).eq('milestone_id', milestoneId);
+    } catch (err: any) {
+      console.warn('Supabase deleteChildMilestone failed, updated memory only:', err.message || err);
+    }
+  }
+
+  async function getChildImmunizations(childId: string): Promise<ChildImmunization[]> {
+    try {
+      const { data, error } = await supabase.from('app_child_immunizations').select('*').eq('child_id', childId);
+      if (error) throw error;
+      if (data && data.length > 0) {
+        return data.map(item => ({
+          id: item.id,
+          childId: item.child_id,
+          immunizationId: item.immunization_id,
+          givenDate: item.given_date,
+          proofPhotoUrl: item.proof_photo_url,
+          createdAt: item.created_at
+        }));
+      }
+    } catch (err: any) {
+      if (isTableMissingError(err)) {
+        console.log('Supabase table app_child_immunizations is not setup yet, using local memory storage.');
+      } else {
+        console.warn('Supabase getChildImmunizations failed, using memory fallback:', err.message || err);
+      }
+    }
+    return childImmunizations.filter(i => i.childId === childId);
+  }
+
+  async function saveChildImmunization(i: ChildImmunization): Promise<void> {
+    const existingIdx = childImmunizations.findIndex(item => item.childId === i.childId && item.immunizationId === i.immunizationId);
+    if (existingIdx !== -1) {
+      childImmunizations[existingIdx] = i;
+    } else {
+      childImmunizations.push(i);
+    }
+    try {
+      await supabase.from('app_child_immunizations').upsert({
+        id: i.id,
+        child_id: i.childId,
+        immunization_id: i.immunizationId,
+        given_date: i.givenDate,
+        proof_photo_url: i.proofPhotoUrl,
+        created_at: i.createdAt
+      });
+    } catch (err: any) {
+      console.warn('Supabase saveChildImmunization failed, updated memory only:', err.message || err);
+    }
+  }
+
+  async function deleteChildImmunization(childId: string, immunizationId: string): Promise<void> {
+    childImmunizations = childImmunizations.filter(item => !(item.childId === childId && item.immunizationId === immunizationId));
+    try {
+      await supabase.from('app_child_immunizations').delete().eq('child_id', childId).eq('immunization_id', immunizationId);
+    } catch (err: any) {
+      console.warn('Supabase deleteChildImmunization failed, updated memory only:', err.message || err);
+    }
+  }
+
+  async function getScreenings(childId: string): Promise<Screening[]> {
+    try {
+      const { data, error } = await supabase.from('app_screenings').select('*').eq('child_id', childId);
+      if (error) throw error;
+      if (data && data.length > 0) {
+        return data.map(item => ({
+          id: item.id,
+          childId: item.child_id,
+          type: item.type as any,
+          ageMonthAtTest: item.age_month_at_test,
+          answers: item.answers,
+          score: item.score,
+          result: item.result as any,
+          recommendation: item.recommendation || '',
+          pdfUrl: item.pdf_url,
+          createdAt: item.created_at
+        })).sort((a,b) => b.createdAt.localeCompare(a.createdAt));
+      }
+    } catch (err: any) {
+      if (isTableMissingError(err)) {
+        console.log('Supabase table app_screenings is not setup yet, using local memory storage.');
+      } else {
+        console.warn('Supabase getScreenings failed, using memory fallback:', err.message || err);
+      }
+    }
+    return screenings.filter(s => s.childId === childId).sort((a,b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  async function saveScreening(s: Screening): Promise<void> {
+    screenings.push(s);
+    try {
+      await supabase.from('app_screenings').insert({
+        id: s.id,
+        child_id: s.childId,
+        type: s.type,
+        age_month_at_test: s.ageMonthAtTest,
+        answers: s.answers,
+        score: s.score,
+        result: s.result,
+        recommendation: s.recommendation,
+        pdf_url: s.pdfUrl,
+        created_at: s.createdAt
+      });
+    } catch (err: any) {
+      console.warn('Supabase saveScreening failed, updated memory only:', err.message || err);
+    }
+  }
+
+  async function getQuestions(): Promise<Question[]> {
+    try {
+      const { data, error } = await supabase.from('app_questions').select('*');
+      if (error) throw error;
+      if (data && data.length > 0) {
+        return data.map(item => ({
+          id: item.id,
+          parentId: item.parent_id,
+          childId: item.child_id,
+          questionText: item.question_text,
+          status: item.status as any,
+          answerText: item.answer_text,
+          answeredBy: item.answered_by,
+          isPublic: item.is_public,
+          createdAt: item.created_at,
+          answeredAt: item.answered_at
+        })).sort((a,b) => b.createdAt.localeCompare(a.createdAt));
+      }
+    } catch (err: any) {
+      if (isTableMissingError(err)) {
+        console.log('Supabase table app_questions is not setup yet, using local memory storage.');
+      } else {
+        console.warn('Supabase getQuestions failed, using memory fallback:', err.message || err);
+      }
+    }
+    return questions.sort((a,b) => b.createdAt.localeCompare(a.createdAt));
+  }
+
+  async function saveQuestion(q: Question): Promise<void> {
+    const existingIdx = questions.findIndex(item => item.id === q.id);
+    if (existingIdx !== -1) {
+      questions[existingIdx] = q;
+    } else {
+      questions.push(q);
+    }
+    try {
+      await supabase.from('app_questions').upsert({
+        id: q.id,
+        parent_id: q.parentId,
+        child_id: q.childId,
+        question_text: q.questionText,
+        status: q.status,
+        answer_text: q.answerText,
+        answered_by: q.answeredBy,
+        is_public: q.isPublic,
+        created_at: q.createdAt,
+        answered_at: q.answeredAt
+      });
+    } catch (err: any) {
+      console.warn('Supabase saveQuestion failed, updated memory only:', err.message || err);
+    }
+  }
+
+  async function getBookings(): Promise<Booking[]> {
+    try {
+      const { data, error } = await supabase.from('app_bookings').select('*').eq('parent_id', 'u_amanda');
+      if (error) throw error;
+      if (data && data.length > 0) {
+        return data.map(item => ({
+          id: item.id,
+          parentId: item.parent_id,
+          childId: item.child_id,
+          serviceType: item.service_type as any,
+          subService: item.sub_service,
+          packageName: item.package_name,
+          therapistId: item.therapist_id,
+          therapistName: item.therapist_name,
+          scheduledAt: item.scheduled_at,
+          status: item.status as any,
+          amount: Number(item.amount),
+          paymentStatus: item.payment_status as any,
+          midtransOrderId: item.midtrans_order_id,
+          bookingCode: item.booking_code,
+          createdAt: item.created_at
+        })).sort((a,b) => b.scheduledAt.localeCompare(a.scheduledAt));
+      }
+    } catch (err: any) {
+      if (isTableMissingError(err)) {
+        console.log('Supabase table app_bookings is not setup yet, using local memory storage.');
+      } else {
+        console.warn('Supabase getBookings failed, using memory fallback:', err.message || err);
+      }
+    }
+    return bookings.filter(b => b.parentId === 'u_amanda').sort((a,b) => b.scheduledAt.localeCompare(a.scheduledAt));
+  }
+
+  async function saveBooking(b: Booking): Promise<void> {
+    const existingIdx = bookings.findIndex(item => item.id === b.id);
+    if (existingIdx !== -1) {
+      bookings[existingIdx] = b;
+    } else {
+      bookings.push(b);
+    }
+    try {
+      await supabase.from('app_bookings').upsert({
+        id: b.id,
+        parent_id: b.parentId,
+        child_id: b.childId,
+        service_type: b.serviceType,
+        sub_service: b.subService,
+        package_name: b.packageName,
+        therapist_id: b.therapistId,
+        therapist_name: b.therapistName,
+        scheduled_at: b.scheduledAt,
+        status: b.status,
+        amount: b.amount,
+        payment_status: b.paymentStatus,
+        midtrans_order_id: b.midtransOrderId,
+        booking_code: b.bookingCode,
+        created_at: b.createdAt
+      });
+    } catch (err: any) {
+      console.warn('Supabase saveBooking failed, updated memory only:', err.message || err);
+    }
+  }
+
+  async function getNotifications(): Promise<Notification[]> {
+    try {
+      const { data, error } = await supabase.from('app_notifications').select('*').eq('parent_id', 'u_amanda');
+      if (error) throw error;
+      if (data && data.length > 0) {
+        return data.map(item => ({
+          id: item.id,
+          parentId: item.parent_id,
+          type: item.type as any,
+          title: item.title,
+          body: item.body,
+          deepLink: item.deep_link,
+          read: item.read,
+          createdAt: item.created_at
+        })).sort((a,b) => b.createdAt.localeCompare(a.createdAt));
+      }
+    } catch (err: any) {
+      if (isTableMissingError(err)) {
+        console.log('Supabase table app_notifications is not setup yet, using local memory storage.');
+      } else {
+        console.warn('Supabase getNotifications failed, using memory fallback:', err.message || err);
+      }
+    }
+    return notifications.filter(n => n.parentId === 'u_amanda');
+  }
+
+  async function addNotification(n: Notification): Promise<void> {
+    notifications.unshift(n);
+    try {
+      await supabase.from('app_notifications').insert({
+        id: n.id,
+        parent_id: n.parentId,
+        type: n.type,
+        title: n.title,
+        body: n.body,
+        deep_link: n.deepLink,
+        read: n.read,
+        created_at: n.createdAt
+      });
+    } catch (err: any) {
+      console.warn('Supabase addNotification failed, updated memory only:', err.message || err);
+    }
+  }
+
+  async function markAllNotificationsRead(): Promise<void> {
+    notifications.forEach(n => {
+      if (n.parentId === 'u_amanda') {
+        n.read = true;
+      }
+    });
+    try {
+      await supabase.from('app_notifications').update({ read: true }).eq('parent_id', 'u_amanda');
+    } catch (err: any) {
+      console.warn('Supabase markAllNotificationsRead failed, updated memory only:', err.message || err);
+    }
+  }
+
+  async function getPreferences(): Promise<NotificationPreferences> {
+    try {
+      const { data, error } = await supabase.from('app_preferences').select('*').eq('parent_id', 'u_amanda').single();
+      if (error) {
+        if (error.code === 'PGRST116') {
+          console.log('Preferences not found in Supabase. Auto-seeding default preferences...');
+          await savePreferences(notificationPreferences);
+          return notificationPreferences;
+        }
+        throw error;
+      }
+      if (data) {
+        return {
+          id: 'np_amanda',
+          parentId: data.parent_id,
+          pushEnabled: data.push_enabled,
+          whatsappEnabled: data.whatsapp_enabled,
+          emailEnabled: data.email_enabled,
+          weeklyDigest: data.weekly_digest,
+          immunizationReminder: data.immunization_reminder,
+          milestoneReminder: data.milestone_reminder
+        };
+      }
+    } catch (err: any) {
+      if (isTableMissingError(err)) {
+        console.log('Supabase table app_preferences is not setup yet, using local memory storage.');
+      } else {
+        console.warn('Supabase getPreferences failed, using memory fallback:', err.message || err);
+      }
+    }
+    return notificationPreferences;
+  }
+
+  async function savePreferences(prefs: NotificationPreferences): Promise<NotificationPreferences> {
+    notificationPreferences = { ...notificationPreferences, ...prefs };
+    try {
+      await supabase.from('app_preferences').upsert({
+        parent_id: prefs.parentId,
+        push_enabled: prefs.pushEnabled,
+        whatsapp_enabled: prefs.whatsappEnabled,
+        email_enabled: prefs.emailEnabled,
+        weekly_digest: prefs.weeklyDigest,
+        immunization_reminder: prefs.immunizationReminder,
+        milestone_reminder: prefs.milestoneReminder
+      });
+    } catch (err: any) {
+      console.warn('Supabase savePreferences failed, updated memory only:', err.message || err);
+    }
+    return notificationPreferences;
+  }
+
+  // ==========================================
   // REST API ENDPOINTS
   // ==========================================
 
-  // Auth / Profile Endpoints
-  app.get('/api/profile', (req: Request, res: Response) => {
-    res.json(activeProfile);
+  // Supabase Connection Health Status
+  app.get('/api/supabase-status', async (req: Request, res: Response) => {
+    try {
+      console.log('DEBUG: Current SUPABASE_URL in server.ts:', SUPABASE_URL);
+      console.log('DEBUG: Current SUPABASE_KEY prefix in server.ts:', SUPABASE_KEY ? SUPABASE_KEY.substring(0, 10) + '...' : 'undefined');
+      
+      const { error } = await supabase.from('app_profiles').select('id').limit(1);
+      if (error) {
+        return res.json({
+          connected: false,
+          error: error.message,
+          url: SUPABASE_URL,
+          keyLength: SUPABASE_KEY ? SUPABASE_KEY.length : 0,
+          keyPrefix: SUPABASE_KEY ? SUPABASE_KEY.substring(0, 5) : '',
+          hint: 'Tabel app_profiles belum ada. Silakan salin & jalankan skrip SQL skema di Supabase SQL Editor Anda.'
+        });
+      }
+      res.json({
+        connected: true,
+        url: SUPABASE_URL,
+        project: 'vtquhqdfyirccxdzmpyr',
+        info: 'Supabase terhubung dengan sukses secara real-time!'
+      });
+    } catch (err: any) {
+      res.json({
+        connected: false,
+        error: err.message || 'Network/Connection error',
+        url: SUPABASE_URL,
+        hint: 'Periksa variabel lingkungan Supabase Anda.'
+      });
+    }
   });
 
-  app.put('/api/profile', (req: Request, res: Response) => {
-    activeProfile = { ...activeProfile, ...req.body };
-    res.json(activeProfile);
+  // Auth / Profile Endpoints
+  app.get('/api/profile', async (req: Request, res: Response) => {
+    const prof = await getProfile();
+    res.json(prof);
+  });
+
+  app.put('/api/profile', async (req: Request, res: Response) => {
+    const prof = await updateProfile(req.body);
+    res.json(prof);
   });
 
   // Children Endpoints
-  app.get('/api/children', (req: Request, res: Response) => {
-    res.json(children);
+  app.get('/api/children', async (req: Request, res: Response) => {
+    const list = await getChildren();
+    res.json(list);
   });
 
-  app.post('/api/children', (req: Request, res: Response) => {
+  app.post('/api/children', async (req: Request, res: Response) => {
+    const activeProf = await getProfile();
     const newChild: Child = {
       id: 'c_' + Date.now(),
-      parentId: activeProfile.id,
+      parentId: activeProf.id,
       name: req.body.name,
       birthDate: req.body.birthDate,
       gender: req.body.gender,
@@ -241,39 +850,37 @@ const PORT = 3000;
       expectedDueDate: req.body.expectedDueDate,
       createdAt: new Date().toISOString()
     };
-    children.push(newChild);
+    await saveChild(newChild);
     res.status(201).json(newChild);
   });
 
-  app.put('/api/children/:id', (req: Request, res: Response) => {
+  app.put('/api/children/:id', async (req: Request, res: Response) => {
     const { id } = req.params;
-    const index = children.findIndex(c => c.id === id);
+    const list = await getChildren();
+    const index = list.findIndex(c => c.id === id);
     if (index !== -1) {
-      children[index] = { ...children[index], ...req.body };
-      res.json(children[index]);
+      const updated = { ...list[index], ...req.body };
+      await saveChild(updated);
+      res.json(updated);
     } else {
       res.status(404).json({ error: 'Child not found' });
     }
   });
 
-  app.delete('/api/children/:id', (req: Request, res: Response) => {
+  app.delete('/api/children/:id', async (req: Request, res: Response) => {
     const { id } = req.params;
-    children = children.filter(c => c.id !== id);
-    growthRecords = growthRecords.filter(g => g.childId !== id);
-    childMilestones = childMilestones.filter(m => m.childId !== id);
-    childImmunizations = childImmunizations.filter(i => i.childId !== id);
-    screenings = screenings.filter(s => s.childId !== id);
+    await deleteChild(id);
     res.json({ success: true });
   });
 
   // Growth Records Endpoints
-  app.get('/api/growth/:childId', (req: Request, res: Response) => {
+  app.get('/api/growth/:childId', async (req: Request, res: Response) => {
     const { childId } = req.params;
-    const records = growthRecords.filter(g => g.childId === childId).sort((a,b) => a.date.localeCompare(b.date));
+    const records = await getGrowthRecords(childId);
     res.json(records);
   });
 
-  app.post('/api/growth', (req: Request, res: Response) => {
+  app.post('/api/growth', async (req: Request, res: Response) => {
     const record: GrowthRecord = {
       id: 'g_' + Date.now(),
       childId: req.body.childId,
@@ -284,37 +891,42 @@ const PORT = 3000;
       notes: req.body.notes || '',
       createdAt: new Date().toISOString()
     };
-    growthRecords.push(record);
+    await saveGrowthRecord(record);
     res.status(201).json(record);
   });
 
-  app.delete('/api/growth/:id', (req: Request, res: Response) => {
+  app.delete('/api/growth/:id', async (req: Request, res: Response) => {
     const { id } = req.params;
-    growthRecords = growthRecords.filter(g => g.id !== id);
+    await deleteGrowthRecord(id);
     res.json({ success: true });
   });
 
   // Milestone Progress Endpoints
-  app.get('/api/milestones/:childId', (req: Request, res: Response) => {
+  app.get('/api/milestones/:childId', async (req: Request, res: Response) => {
     const { childId } = req.params;
-    res.json(childMilestones.filter(m => m.childId === childId));
+    const list = await getChildMilestones(childId);
+    res.json(list);
   });
 
-  app.post('/api/milestones/toggle', (req: Request, res: Response) => {
+  app.post('/api/milestones/toggle', async (req: Request, res: Response) => {
     const { childId, milestoneId, achieved } = req.body;
     
-    const existingIndex = childMilestones.findIndex(
+    const list = await getChildMilestones(childId);
+    const existingIndex = list.findIndex(
       m => m.childId === childId && m.milestoneId === milestoneId
     );
 
     if (existingIndex !== -1) {
       if (!achieved) {
-        // Remove item
-        childMilestones.splice(existingIndex, 1);
+        await deleteChildMilestone(childId, milestoneId);
         res.json({ achieved: false });
       } else {
-        childMilestones[existingIndex].achievedDate = new Date().toISOString().split('T')[0];
-        res.json(childMilestones[existingIndex]);
+        const updated = {
+          ...list[existingIndex],
+          achievedDate: new Date().toISOString().split('T')[0]
+        };
+        await saveChildMilestone(updated);
+        res.json(updated);
       }
     } else if (achieved) {
       const newCheck: ChildMilestone = {
@@ -325,7 +937,7 @@ const PORT = 3000;
         achievedDate: new Date().toISOString().split('T')[0],
         createdAt: new Date().toISOString()
       };
-      childMilestones.push(newCheck);
+      await saveChildMilestone(newCheck);
       res.status(201).json(newCheck);
     } else {
       res.json({ achieved: false });
@@ -333,27 +945,32 @@ const PORT = 3000;
   });
 
   // Immunization Endpoints
-  app.get('/api/immunization/:childId', (req: Request, res: Response) => {
+  app.get('/api/immunization/:childId', async (req: Request, res: Response) => {
     const { childId } = req.params;
-    res.json(childImmunizations.filter(i => i.childId === childId));
+    const list = await getChildImmunizations(childId);
+    res.json(list);
   });
 
-  app.post('/api/immunization/toggle', (req: Request, res: Response) => {
+  app.post('/api/immunization/toggle', async (req: Request, res: Response) => {
     const { childId, immunizationId, givenDate, proofPhotoUrl } = req.body;
 
-    const existingIndex = childImmunizations.findIndex(
+    const list = await getChildImmunizations(childId);
+    const existingIndex = list.findIndex(
       i => i.childId === childId && i.immunizationId === immunizationId
     );
 
     if (existingIndex !== -1) {
       if (!givenDate) {
-        // Untoggle / delete vaccine date
-        childImmunizations.splice(existingIndex, 1);
+        await deleteChildImmunization(childId, immunizationId);
         res.json({ given: false });
       } else {
-        childImmunizations[existingIndex].givenDate = givenDate;
-        childImmunizations[existingIndex].proofPhotoUrl = proofPhotoUrl || childImmunizations[existingIndex].proofPhotoUrl;
-        res.json(childImmunizations[existingIndex]);
+        const updated = {
+          ...list[existingIndex],
+          givenDate,
+          proofPhotoUrl: proofPhotoUrl || list[existingIndex].proofPhotoUrl
+        };
+        await saveChildImmunization(updated);
+        res.json(updated);
       }
     } else if (givenDate) {
       const newImm: ChildImmunization = {
@@ -364,7 +981,7 @@ const PORT = 3000;
         proofPhotoUrl: proofPhotoUrl || '',
         createdAt: new Date().toISOString()
       };
-      childImmunizations.push(newImm);
+      await saveChildImmunization(newImm);
       res.status(201).json(newImm);
     } else {
       res.json({ given: false });
@@ -372,12 +989,14 @@ const PORT = 3000;
   });
 
   // Clinical Screenings Endpoints
-  app.get('/api/screenings/:childId', (req: Request, res: Response) => {
+  app.get('/api/screenings/:childId', async (req: Request, res: Response) => {
     const { childId } = req.params;
-    res.json(screenings.filter(s => s.childId === childId).sort((a,b) => b.createdAt.localeCompare(a.createdAt)));
+    const list = await getScreenings(childId);
+    res.json(list);
   });
 
-  app.post('/api/screenings', (req: Request, res: Response) => {
+  app.post('/api/screenings', async (req: Request, res: Response) => {
+    const activeProf = await getProfile();
     const screening: Screening = {
       id: 's_' + Date.now(),
       childId: req.body.childId,
@@ -390,40 +1009,46 @@ const PORT = 3000;
       pdfUrl: req.body.pdfUrl,
       createdAt: new Date().toISOString()
     };
-    screenings.push(screening);
+    await saveScreening(screening);
 
     // Create a notification for red flag or alert
     if (screening.result.includes('risiko_tinggi') || screening.result === 'penyimpangan' || screening.result === 'risiko_sedang' || screening.result === 'meragukan') {
-      notifications.unshift({
+      const newNotif: Notification = {
         id: 'n_' + Date.now(),
-        parentId: activeProfile.id,
+        parentId: activeProf.id,
         type: 'screening',
         title: `Peringatan Skrining: ${screening.type.toUpperCase()}`,
         body: `Hasil skrining ${screening.type.toUpperCase()} Aiden menunjukkan indikasi ${screening.result.replace('_', ' ')}. Silakan tinjau rekomendasi terapi & konsultasi psikolog kami.`,
         deepLink: 'screenings',
         read: false,
         createdAt: new Date().toISOString()
-      });
+      };
+      await addNotification(newNotif);
     }
 
     res.status(201).json(screening);
   });
 
   // Q&A / Tanya Ahli Endpoints
-  app.get('/api/questions', (req: Request, res: Response) => {
+  app.get('/api/questions', async (req: Request, res: Response) => {
+    const activeProf = await getProfile();
+    const list = await getQuestions();
     // Return all public questions plus active user's questions
-    const list = questions.filter(q => q.isPublic || q.parentId === activeProfile.id);
-    res.json(list.sort((a,b) => b.createdAt.localeCompare(a.createdAt)));
+    const filtered = list.filter(q => q.isPublic || q.parentId === activeProf.id);
+    res.json(filtered.sort((a,b) => b.createdAt.localeCompare(a.createdAt)));
   });
 
   app.post('/api/questions', async (req: Request, res: Response) => {
-    const parentId = activeProfile.id;
+    const activeProf = await getProfile();
+    const parentId = activeProf.id;
     
     // Enforce Monthly Q&A limit (max 3 questions per month per user)
     const currentMonthStart = new Date();
     currentMonthStart.setDate(1);
     currentMonthStart.setHours(0,0,0,0);
-    const monthlyCount = questions.filter(
+    
+    const list = await getQuestions();
+    const monthlyCount = list.filter(
       q => q.parentId === parentId && new Date(q.createdAt) >= currentMonthStart
     ).length;
 
@@ -443,7 +1068,7 @@ const PORT = 3000;
       isPublic: req.body.isPublic ?? true,
       createdAt: new Date().toISOString()
     };
-    questions.push(newQuestion);
+    await saveQuestion(newQuestion);
 
     // Trigger AI Answer Generation asynchronously on behalf of the expert clinic
     setTimeout(async () => {
@@ -480,24 +1105,30 @@ Gunakan bahasa Indonesia yang santun, runtut, dan terstruktur rapi dengan paragr
         }
 
         // Update question in database
-        const qIndex = questions.findIndex(q => q.id === newQuestion.id);
+        const qList = await getQuestions();
+        const qIndex = qList.findIndex(q => q.id === newQuestion.id);
         if (qIndex !== -1) {
-          questions[qIndex].status = 'answered';
-          questions[qIndex].answerText = expertAnswer;
-          questions[qIndex].answeredBy = 'Ira Amanda, M.Psi., Psikolog';
-          questions[qIndex].answeredAt = new Date().toISOString();
+          const updatedQ = {
+            ...qList[qIndex],
+            status: 'answered' as const,
+            answerText: expertAnswer,
+            answeredBy: 'Ira Amanda, M.Psi., Psikolog',
+            answeredAt: new Date().toISOString()
+          };
+          await saveQuestion(updatedQ);
 
           // Add in-app notification
-          notifications.unshift({
+          const newNotif: Notification = {
             id: 'n_' + Date.now(),
-            parentId: activeProfile.id,
+            parentId: activeProf.id,
             type: 'q_and_a',
             title: 'Tanya Ahli Terjawab!',
             body: `Pertanyaan Anda mengenai tumbuh kembang anak telah dijawab oleh Ira Amanda, M.Psi., Psikolog.`,
             deepLink: 'experts',
             read: false,
             createdAt: new Date().toISOString()
-          });
+          };
+          await addNotification(newNotif);
         }
       } catch (err) {
         console.error('Failed to generate expert response with Gemini:', err);
@@ -509,7 +1140,8 @@ Gunakan bahasa Indonesia yang santun, runtut, dan terstruktur rapi dengan paragr
 
   app.post('/api/questions/answer-ai', async (req: Request, res: Response) => {
     const { questionId } = req.body;
-    const q = questions.find(item => item.id === questionId);
+    const qList = await getQuestions();
+    const q = qList.find(item => item.id === questionId);
     if (!q) {
       return res.status(404).json({ error: 'Question not found' });
     }
@@ -543,40 +1175,49 @@ Draf jawaban harus sangat hangat, empatik, kredibel secara medis/psikologis, mem
     }
   });
 
-  app.post('/api/questions/:id/answer', (req: Request, res: Response) => {
+  app.post('/api/questions/:id/answer', async (req: Request, res: Response) => {
     const { id } = req.params;
     const { expertId, answerText } = req.body;
-    const index = questions.findIndex(q => q.id === id);
+    const activeProf = await getProfile();
+    const qList = await getQuestions();
+    const index = qList.findIndex(q => q.id === id);
     if (index !== -1) {
-      questions[index].status = 'answered';
-      questions[index].answerText = answerText;
-      questions[index].answeredBy = expertId === 'exp_ira' ? 'Ira Amanda, M.Psi., Psikolog' : 'Rian Hidayat, A.Md.OT';
-      questions[index].answeredAt = new Date().toISOString();
+      const updatedQ = {
+        ...qList[index],
+        status: 'answered' as const,
+        answerText,
+        answeredBy: expertId === 'exp_ira' ? 'Ira Amanda, M.Psi., Psikolog' : 'Rian Hidayat, A.Md.OT',
+        answeredAt: new Date().toISOString()
+      };
+      await saveQuestion(updatedQ);
 
       // Notify
-      notifications.unshift({
+      const newNotif: Notification = {
         id: 'n_' + Date.now(),
-        parentId: activeProfile.id,
+        parentId: activeProf.id,
         type: 'q_and_a',
         title: 'Tanya Ahli Terjawab!',
         body: `Pertanyaan Anda telah dijawab langsung oleh psikolog anak kami.`,
         deepLink: 'experts',
         read: false,
         createdAt: new Date().toISOString()
-      });
+      };
+      await addNotification(newNotif);
 
-      res.json(questions[index]);
+      res.json(updatedQ);
     } else {
       res.status(404).json({ error: 'Question not found' });
     }
   });
 
   // Clinical Bookings Endpoints
-  app.get('/api/bookings', (req: Request, res: Response) => {
-    res.json(bookings.filter(b => b.parentId === activeProfile.id).sort((a,b) => b.scheduledAt.localeCompare(a.scheduledAt)));
+  app.get('/api/bookings', async (req: Request, res: Response) => {
+    const list = await getBookings();
+    res.json(list);
   });
 
-  app.post('/api/bookings', (req: Request, res: Response) => {
+  app.post('/api/bookings', async (req: Request, res: Response) => {
+    const activeProf = await getProfile();
     const code = 'FC-' + req.body.serviceType.toUpperCase().substring(0,2) + '-' + Math.floor(1000 + Math.random() * 9000);
     const amountMap: Record<string, number> = {
       'onsite': 250000,
@@ -588,7 +1229,7 @@ Draf jawaban harus sangat hangat, empatik, kredibel secara medis/psikologis, mem
 
     const newBooking: Booking = {
       id: 'b_' + Date.now(),
-      parentId: activeProfile.id,
+      parentId: activeProf.id,
       childId: req.body.childId,
       serviceType: req.body.serviceType,
       subService: req.body.subService,
@@ -604,81 +1245,92 @@ Draf jawaban harus sangat hangat, empatik, kredibel secara medis/psikologis, mem
       createdAt: new Date().toISOString()
     };
 
-    bookings.unshift(newBooking);
+    await saveBooking(newBooking);
 
     // Create a pending booking notification
-    notifications.unshift({
+    const newNotif: Notification = {
       id: 'n_' + Date.now(),
-      parentId: activeProfile.id,
+      parentId: activeProf.id,
       type: 'booking',
       title: 'Booking Berhasil Dibuat',
       body: `Booking ${newBooking.subService} untuk anak Anda telah dibuat. Selesaikan pembayaran DP/Lunas untuk konfirmasi jadwal. Kode: ${newBooking.bookingCode}`,
       deepLink: 'bookings',
       read: false,
       createdAt: new Date().toISOString()
-    });
+    };
+    await addNotification(newNotif);
 
     res.status(201).json(newBooking);
   });
 
-  app.post('/api/bookings/:id/pay', (req: Request, res: Response) => {
+  app.post('/api/bookings/:id/pay', async (req: Request, res: Response) => {
     const { id } = req.params;
-    const index = bookings.findIndex(b => b.id === id);
+    const activeProf = await getProfile();
+    const list = await getBookings();
+    const index = list.findIndex(b => b.id === id);
     if (index !== -1) {
-      bookings[index].status = 'paid';
-      bookings[index].paymentStatus = 'paid';
+      const updated = {
+        ...list[index],
+        status: 'paid' as const,
+        paymentStatus: 'paid' as const
+      };
+      await saveBooking(updated);
       
       // Notify payment successful
-      notifications.unshift({
+      const newNotif: Notification = {
         id: 'n_' + Date.now(),
-        parentId: activeProfile.id,
+        parentId: activeProf.id,
         type: 'booking',
         title: 'Pembayaran Dikonfirmasi!',
-        body: `Pembayaran Rp ${bookings[index].amount.toLocaleString('id-ID')} untuk booking ${bookings[index].subService} telah diverifikasi. Sampai jumpa di klinik!`,
+        body: `Pembayaran Rp ${updated.amount.toLocaleString('id-ID')} untuk booking ${updated.subService} telah diverifikasi. Sampai jumpa di klinik!`,
         deepLink: 'bookings',
         read: false,
         createdAt: new Date().toISOString()
-      });
+      };
+      await addNotification(newNotif);
 
-      res.json(bookings[index]);
+      res.json(updated);
     } else {
       res.status(404).json({ error: 'Booking not found' });
     }
   });
 
-  app.post('/api/bookings/:id/cancel', (req: Request, res: Response) => {
+  app.post('/api/bookings/:id/cancel', async (req: Request, res: Response) => {
     const { id } = req.params;
-    const index = bookings.findIndex(b => b.id === id);
+    const list = await getBookings();
+    const index = list.findIndex(b => b.id === id);
     if (index !== -1) {
-      bookings[index].status = 'cancelled';
-      res.json(bookings[index]);
+      const updated = {
+        ...list[index],
+        status: 'cancelled' as const
+      };
+      await saveBooking(updated);
+      res.json(updated);
     } else {
       res.status(404).json({ error: 'Booking not found' });
     }
   });
 
   // Notifications Endpoints
-  app.get('/api/notifications', (req: Request, res: Response) => {
-    res.json(notifications.filter(n => n.parentId === activeProfile.id));
+  app.get('/api/notifications', async (req: Request, res: Response) => {
+    const list = await getNotifications();
+    res.json(list);
   });
 
-  app.post('/api/notifications/read-all', (req: Request, res: Response) => {
-    notifications.forEach(n => {
-      if (n.parentId === activeProfile.id) {
-        n.read = true;
-      }
-    });
+  app.post('/api/notifications/read-all', async (req: Request, res: Response) => {
+    await markAllNotificationsRead();
     res.json({ success: true });
   });
 
   // Preferences Endpoints
-  app.get('/api/preferences', (req: Request, res: Response) => {
-    res.json(notificationPreferences);
+  app.get('/api/preferences', async (req: Request, res: Response) => {
+    const prefs = await getPreferences();
+    res.json(prefs);
   });
 
-  app.put('/api/preferences', (req: Request, res: Response) => {
-    notificationPreferences = { ...notificationPreferences, ...req.body };
-    res.json(notificationPreferences);
+  app.put('/api/preferences', async (req: Request, res: Response) => {
+    const prefs = await savePreferences(req.body);
+    res.json(prefs);
   });
 
 

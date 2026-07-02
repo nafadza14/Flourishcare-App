@@ -90,7 +90,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           <div className="w-20 h-20 bg-white border border-orange-100 rounded-3xl flex items-center justify-center mb-3 p-2 shadow-sm">
             <FlourishCareLogo className="w-16 h-16" />
           </div>
-          <h1 className="text-3xl font-extrabold text-brand-brown font-display tracking-tight">FlourishCare</h1>
+          <h1 className="text-3xl font-extrabold text-brand-brown font-display tracking-tight">Flourishcare App</h1>
           <p className="text-sm text-brand-brown/70 mt-1">Rumah Tumbuh Kembang di Genggamanmu</p>
         </div>
 

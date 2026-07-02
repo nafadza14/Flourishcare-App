@@ -119,7 +119,7 @@ export default function ContentLibrary() {
                   <strong>URL:</strong> /edukasi/{selectedArticle.slug}
                 </div>
                 <div>
-                  <strong>Meta Title:</strong> {selectedArticle.title} | FlourishCare
+                  <strong>Meta Title:</strong> {selectedArticle.title} | Flourishcare App
                 </div>
                 <div className="md:col-span-2">
                   <strong>Meta Description:</strong> Baca panduan kesehatan anak tentang {selectedArticle.title} yang direview secara medis oleh psikolog & dokter anak Indonesia.

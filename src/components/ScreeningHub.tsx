@@ -244,7 +244,7 @@ export default function ScreeningHub({ child, onNavigateToBooking }: ScreeningHu
               <div className="flex items-center gap-2.5">
                 <div className="w-10 h-10 bg-brand-orange text-white rounded-full flex items-center justify-center font-bold text-lg font-display">FC</div>
                 <div>
-                  <h1 className="text-xl font-black text-brand-brown font-display">FlourishCare</h1>
+                  <h1 className="text-xl font-black text-brand-brown font-display">Flourishcare App</h1>
                   <p className="text-[10px] text-brand-brown/60 tracking-wider font-extrabold">Klinik Tumbuh Kembang & Intervensi Dini Terpadu</p>
                 </div>
               </div>

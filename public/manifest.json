@@ -1,15 +1,15 @@
 {
-  "short_name": "FlourishCare",
-  "name": "FlourishCare — Rumah Tumbuh Kembang Digital",
+  "short_name": "Flourishcare App",
+  "name": "Flourishcare App #1 Platform tumbuh kembang si kecil",
   "icons": [
     {
-      "src": "https://images.unsplash.com/photo-1596464716127-f2a82984de30?q=80&w=192&h=192&fit=crop",
-      "type": "image/png",
+      "src": "/logo.svg",
+      "type": "image/svg+xml",
       "sizes": "192x192"
     },
     {
-      "src": "https://images.unsplash.com/photo-1596464716127-f2a82984de30?q=80&w=512&h=512&fit=crop",
-      "type": "image/png",
+      "src": "/logo.svg",
+      "type": "image/svg+xml",
       "sizes": "512x512"
     }
   ],
