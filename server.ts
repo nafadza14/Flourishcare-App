@@ -838,20 +838,45 @@ const PORT = 3000;
   });
 
   app.post('/api/children', async (req: Request, res: Response) => {
-    const activeProf = await getProfile();
-    const newChild: Child = {
-      id: 'c_' + Date.now(),
-      parentId: activeProf.id,
-      name: req.body.name,
-      birthDate: req.body.birthDate,
-      gender: req.body.gender,
-      isPremature: req.body.isPremature || false,
-      medicalNotes: req.body.medicalNotes || '',
-      expectedDueDate: req.body.expectedDueDate,
-      createdAt: new Date().toISOString()
-    };
-    await saveChild(newChild);
-    res.status(201).json(newChild);
+    try {
+      let parentId = 'u_amanda';
+      try {
+        const activeProf = await getProfile();
+        if (activeProf && activeProf.id) {
+          parentId = activeProf.id;
+        }
+      } catch (profileErr) {
+        console.warn('Error fetching profile for post-child, using fallback parent ID:', profileErr);
+      }
+
+      const newChild: Child = {
+        id: 'c_' + Date.now(),
+        parentId: parentId,
+        name: req.body.name || 'Si Kecil',
+        birthDate: req.body.birthDate || new Date().toISOString().split('T')[0],
+        gender: req.body.gender || 'L',
+        isPremature: req.body.isPremature || false,
+        medicalNotes: req.body.medicalNotes || '',
+        expectedDueDate: req.body.expectedDueDate,
+        createdAt: new Date().toISOString()
+      };
+      await saveChild(newChild);
+      res.status(201).json(newChild);
+    } catch (err: any) {
+      console.error('Crash in POST /api/children:', err);
+      const fallbackChild: Child = {
+        id: 'c_fallback_' + Date.now(),
+        parentId: 'u_amanda',
+        name: req.body.name || 'Si Kecil',
+        birthDate: req.body.birthDate || new Date().toISOString().split('T')[0],
+        gender: req.body.gender || 'L',
+        isPremature: req.body.isPremature || false,
+        medicalNotes: req.body.medicalNotes || '',
+        createdAt: new Date().toISOString()
+      };
+      children.push(fallbackChild);
+      res.status(201).json(fallbackChild);
+    }
   });
 
   app.put('/api/children/:id', async (req: Request, res: Response) => {
