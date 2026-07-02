@@ -112,13 +112,32 @@ export default function App() {
 
       // 2. Fetch Children List
       const childRes = await fetch('/api/children');
+      let childrenData: Child[] = [];
       if (childRes.ok) {
-        const childrenData = await childRes.json();
-        setChildren(childrenData);
-        if (childrenData.length > 0) {
-          setActiveChild(childrenData[0]);
-          fetchLatestGrowth(childrenData[0].id);
+        childrenData = await childRes.json();
+      }
+
+      // Merge with localStorage fallback
+      try {
+        const localChildrenStr = localStorage.getItem('fc_local_children');
+        if (localChildrenStr) {
+          const localChildren = JSON.parse(localChildrenStr);
+          if (Array.isArray(localChildren)) {
+            localChildren.forEach((lc: Child) => {
+              if (!childrenData.some(c => c.id === lc.id)) {
+                childrenData.push(lc);
+              }
+            });
+          }
         }
+      } catch (localErr) {
+        console.warn('Failed to load local children:', localErr);
+      }
+
+      setChildren(childrenData);
+      if (childrenData.length > 0) {
+        setActiveChild(childrenData[0]);
+        fetchLatestGrowth(childrenData[0].id);
       }
     } catch (err) {
       console.error('Failed to load initial data:', err);

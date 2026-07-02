@@ -49,20 +49,54 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
         medicalNotes.trim()
       ].filter(Boolean).join(' ');
 
-      const response = await fetch('/api/children', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name,
-          birthDate,
-          gender,
-          isPremature,
-          medicalNotes: notesCombined
-        }),
-      });
+      const childPayload = {
+        name,
+        birthDate,
+        gender,
+        isPremature,
+        medicalNotes: notesCombined
+      };
 
-      if (!response.ok) throw new Error('Gagal menyimpan profil anak.');
-      const newChild = await response.json();
+      let newChild: any = null;
+      try {
+        const response = await fetch('/api/children', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(childPayload),
+        });
+
+        if (response.ok) {
+          newChild = await response.json();
+        } else {
+          console.warn('API POST /api/children returned non-OK status. Using local fallback.');
+        }
+      } catch (fetchErr) {
+        console.warn('API POST /api/children failed. Using local fallback.', fetchErr);
+      }
+
+      // If API failed, create fallback child object
+      if (!newChild) {
+        newChild = {
+          id: 'c_local_' + Date.now(),
+          parentId: 'u_amanda',
+          name: name || 'Si Kecil',
+          birthDate: birthDate || new Date().toISOString().split('T')[0],
+          gender: gender || 'L',
+          isPremature: isPremature || false,
+          medicalNotes: notesCombined,
+          createdAt: new Date().toISOString()
+        };
+
+        // Persist to localStorage
+        try {
+          const currentLocal = JSON.parse(localStorage.getItem('fc_local_children') || '[]');
+          currentLocal.push(newChild);
+          localStorage.setItem('fc_local_children', JSON.stringify(currentLocal));
+        } catch (storageErr) {
+          console.warn('Failed to save fallback child to localStorage:', storageErr);
+        }
+      }
+
       onComplete(newChild);
     } catch (err: any) {
       setError(err.message || 'Terjadi kesalahan saat menyimpan data.');
