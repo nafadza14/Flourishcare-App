@@ -30,11 +30,10 @@ if (process.env.GEMINI_API_KEY) {
   console.warn('GEMINI_API_KEY environment variable is not defined. Tanya Ahli fallback answers will be active.');
 }
 
-async function startServer() {
-  const app = express();
-  app.use(express.json());
+const app = express();
+app.use(express.json());
 
-  const PORT = 3000;
+const PORT = 3000;
 
   // ==========================================
   // IN-MEMORY PERSISTENT STORE (PRE-SEEDED)
@@ -687,25 +686,30 @@ Draf jawaban harus sangat hangat, empatik, kredibel secara medis/psikologis, mem
   // VITE DEVELOPMENT OR PRODUCTION MIDDLEWARE
   // ==========================================
   
-  if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req: Request, res: Response) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+  async function startLocalServer() {
+    if (process.env.NODE_ENV !== 'production') {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: 'spa',
+      });
+      app.use(vite.middlewares);
+    } else {
+      const distPath = path.join(process.cwd(), 'dist');
+      app.use(express.static(distPath));
+      app.get('*', (req: Request, res: Response) => {
+        res.sendFile(path.join(distPath, 'index.html'));
+      });
+    }
+
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`FlourishCare server running on http://localhost:${PORT}`);
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`FlourishCare server running on http://localhost:${PORT}`);
-  });
-}
+  if (!process.env.VERCEL) {
+    startLocalServer().catch((err) => {
+      console.error('Failed to start fullstack FlourishCare server:', err);
+    });
+  }
 
-startServer().catch((err) => {
-  console.error('Failed to start fullstack FlourishCare server:', err);
-});
+  export { app };
