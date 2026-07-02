@@ -56,6 +56,7 @@ export default function App() {
   // Mobile App Tab Navigation
   // 'home' is the central mobile dashboard, and others are sub-pages
   const [activeTab, setActiveTab] = useState<string>('home');
+  const [authRedirectTab, setAuthRedirectTab] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAboutDialog, setShowAboutDialog] = useState(false);
   
@@ -102,6 +103,12 @@ export default function App() {
     setProfile(user);
     setToken(authToken);
     localStorage.setItem('auth_token', authToken);
+    if (authRedirectTab) {
+      setActiveTab(authRedirectTab);
+      setAuthRedirectTab(null);
+    } else {
+      setActiveTab('home');
+    }
   };
 
   const handleLogout = () => {
@@ -111,6 +118,21 @@ export default function App() {
     setChildren([]);
     setActiveChild(null);
     setLatestGrowth(null);
+    setActiveTab('home');
+  };
+
+  const handleTabClick = (tab: string) => {
+    const isPublicTab = tab === 'home' || tab === 'library';
+    if (!token || !profile) {
+      if (isPublicTab) {
+        setActiveTab(tab);
+      } else {
+        setAuthRedirectTab(tab);
+        setActiveTab('auth');
+      }
+    } else {
+      setActiveTab(tab);
+    }
   };
 
   const fetchInitialData = async () => {
@@ -221,17 +243,14 @@ export default function App() {
     );
   }
 
-  // If user is not authenticated, show premium Sign In / Sign Up screen
-  if (!token || !profile) {
-    return <Auth onAuthSuccess={handleAuthSuccess} />;
-  }
+  // If user is authenticated but no children logged, force the beautiful onboarding questionnaire flow
+  const needsOnboarding = token && profile && (children.length === 0 || !activeChild);
 
-  // If no children logged, force the beautiful onboarding questionnaire flow
-  if (children.length === 0 || !activeChild) {
+  if (needsOnboarding) {
     return <Onboarding onComplete={handleOnboardingComplete} />;
   }
 
-  const ageInMonths = calculateAgeInMonths(activeChild.birthDate);
+  const ageInMonths = activeChild ? calculateAgeInMonths(activeChild.birthDate) : 0;
 
   // Helper to determine active subpage title
   const getSubPageTitle = (tab: string): string => {
@@ -295,103 +314,142 @@ export default function App() {
                       </div>
 
                       <div className="flex items-center gap-2.5">
-                        <div className="text-right">
-                          <span className="block text-[10px] text-orange-100/90 font-semibold leading-tight">
-                            Halo {profile?.role === 'caregiver' ? 'Wali' : 'Ayah/Bunda'}
-                          </span>
-                          <span className="block text-xs font-extrabold text-[#FFFDE9] leading-none">{profile?.fullName.split(' ')[0] || 'Amanda'}</span>
-                        </div>
-                        <button
-                          onClick={handleLogout}
-                          className="w-9 h-9 rounded-full border border-white/25 bg-white/10 shrink-0 flex items-center justify-center hover:bg-white/20 transition-all cursor-pointer active:scale-95"
-                          title="Keluar / Ganti Akun"
-                        >
-                          <LogOut className="w-4.5 h-4.5 text-brand-yellow" />
-                        </button>
+                        {profile ? (
+                          <>
+                            <div className="text-right">
+                              <span className="block text-[10px] text-orange-100/90 font-semibold leading-tight">
+                                Halo {profile.role === 'caregiver' ? 'Wali' : 'Ayah/Bunda'}
+                              </span>
+                              <span className="block text-xs font-extrabold text-[#FFFDE9] leading-none">
+                                {profile.fullName.split(' ')[0]}
+                              </span>
+                            </div>
+                            <button
+                              onClick={handleLogout}
+                              className="w-9 h-9 rounded-full border border-white/25 bg-white/10 shrink-0 flex items-center justify-center hover:bg-white/20 transition-all cursor-pointer active:scale-95"
+                              title="Keluar / Ganti Akun"
+                            >
+                              <LogOut className="w-4.5 h-4.5 text-brand-yellow" />
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setAuthRedirectTab('home');
+                              setActiveTab('auth');
+                            }}
+                            className="px-3 py-1.5 bg-[#FFFDF0] hover:bg-orange-50 text-brand-orange text-[10px] font-black rounded-xl shadow-cocoa-resting/10 active:scale-95 transition-all cursor-pointer shrink-0"
+                          >
+                            Masuk / Daftar
+                          </button>
+                        )}
                       </div>
                     </div>
 
                     {/* Horizontal Children Profiles Switcher Inside Cocoa Header */}
-                    <div className="space-y-1.5 pt-1">
-                      <span className="block text-[8px] text-orange-100/90 font-black tracking-widest">PILIH ANAK</span>
-                      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-                        {children.map((c) => (
-                          <button
-                            key={c.id}
-                            onClick={() => handleSwitchChild(c)}
-                            className={`px-3.5 py-2 rounded-full text-xs font-bold shrink-0 flex items-center gap-1.5 cursor-pointer transition-all ${
-                              activeChild.id === c.id
-                                ? 'bg-white text-brand-orange font-extrabold shadow-cocoa-resting scale-102'
-                                : 'bg-white/10 text-white hover:bg-white/20 border border-white/5'
-                            }`}
-                          >
-                            <Baby className="w-3.5 h-3.5" />
-                            {c.name}
-                          </button>
-                        ))}
+                    {profile && children.length > 0 && activeChild && (
+                      <div className="space-y-1.5 pt-1">
+                        <span className="block text-[8px] text-orange-100/90 font-black tracking-widest">PILIH ANAK</span>
+                        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                          {children.map((c) => (
+                            <button
+                              key={c.id}
+                              onClick={() => handleSwitchChild(c)}
+                              className={`px-3.5 py-2 rounded-full text-xs font-bold shrink-0 flex items-center gap-1.5 cursor-pointer transition-all ${
+                                activeChild.id === c.id
+                                  ? 'bg-white text-brand-orange font-extrabold shadow-cocoa-resting scale-102'
+                                  : 'bg-white/10 text-white hover:bg-white/20 border border-white/5'
+                              }`}
+                            >
+                              <Baby className="w-3.5 h-3.5" />
+                              {c.name}
+                            </button>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     {/* Integrated Signature Growth Arc inside Cocoa Card */}
-                    <div className="bg-white rounded-[28px] p-5 flex items-center justify-between gap-4 mt-1 border border-orange-100/30 shadow-cocoa-raised text-brand-brown">
-                      <div className="space-y-3 flex-1">
+                    {profile && activeChild ? (
+                      <div className="bg-white rounded-[28px] p-5 flex items-center justify-between gap-4 mt-1 border border-orange-100/30 shadow-cocoa-raised text-brand-brown">
+                        <div className="space-y-3 flex-1">
+                          <div>
+                            <span className="text-[9px] font-black tracking-widest text-brand-orange uppercase">Anak Tercinta</span>
+                            <h3 className="font-extrabold text-lg leading-tight text-brand-brown font-display mt-0.5">{activeChild.name}</h3>
+                            <p className="text-xs font-bold text-brand-brown/70 mt-0.5">{ageInMonths} Bulan ({activeChild.gender === 'L' ? 'Laki-laki' : 'Perempuan'})</p>
+                          </div>
+
+                          {/* Flat horizontal metrics grid */}
+                          <div className="grid grid-cols-3 gap-1 bg-[#FFF9EE] rounded-2xl p-2.5 text-center text-[10px] font-bold text-brand-brown border border-orange-100/10">
+                            <div>
+                              <div className="text-[7px] text-brand-brown/50 font-black tracking-wider mb-0.5">Berat</div>
+                              <div className="text-xs font-black text-brand-orange">{latestGrowth ? `${latestGrowth.weightKg} kg` : '-'}</div>
+                            </div>
+                            <div className="border-x border-orange-100/35">
+                              <div className="text-[7px] text-brand-brown/50 font-black tracking-wider mb-0.5">Tinggi</div>
+                              <div className="text-xs font-black text-brand-orange">{latestGrowth ? `${latestGrowth.heightCm} cm` : '-'}</div>
+                            </div>
+                            <div>
+                              <div className="text-[7px] text-brand-brown/50 font-black tracking-wider mb-0.5">L.Kepala</div>
+                              <div className="text-xs font-black text-brand-orange">{latestGrowth ? `${latestGrowth.headCircumferenceCm} cm` : '-'}</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Growth Arc SVG inside header - Signature visual Moment */}
+                        <div className="relative w-24 h-24 shrink-0 flex items-center justify-center bg-[#FFF9EE] rounded-full p-1.5 border border-orange-100/20">
+                          <svg className="absolute inset-0 w-full h-full transform -rotate-90">
+                            {/* Outer Track Arc */}
+                            <circle
+                              cx="48"
+                              cy="48"
+                              r="36"
+                              className="stroke-orange-100 fill-none"
+                              strokeWidth="5"
+                              strokeDasharray="226"
+                              strokeDashoffset="56" /* Represents half-circle arcs */
+                            />
+                            {/* Inner Active Sunrise Arc */}
+                            <circle
+                              cx="48"
+                              cy="48"
+                              r="36"
+                              className="stroke-brand-orange fill-none"
+                              strokeWidth="5.5"
+                              strokeDasharray="226"
+                              strokeDashoffset="100" /* Represents simulated completed progress percentage */
+                              strokeLinecap="round"
+                            />
+                          </svg>
+                          
+                          {/* Display Center text */}
+                          <div className="text-center z-10 flex flex-col justify-center items-center">
+                            <span className="text-xs font-black text-brand-orange">85%</span>
+                            <span className="text-[8px] tracking-widest text-brand-brown/65 font-bold leading-none mt-0.5">Milestone</span>
+                          </div>
+                        </div>
+
+                      </div>
+                    ) : (
+                      <div className="bg-white rounded-[28px] p-5 flex flex-col gap-3.5 mt-1 border border-orange-100/30 shadow-cocoa-raised text-brand-brown">
                         <div>
-                          <span className="text-[9px] font-black tracking-widest text-brand-orange uppercase">Anak Tercinta</span>
-                          <h3 className="font-extrabold text-lg leading-tight text-brand-brown font-display mt-0.5">{activeChild.name}</h3>
-                          <p className="text-xs font-bold text-brand-brown/70 mt-0.5">{ageInMonths} Bulan ({activeChild.gender === 'L' ? 'Laki-laki' : 'Perempuan'})</p>
+                          <span className="text-[8px] font-black tracking-widest text-brand-orange uppercase">Selamat Datang</span>
+                          <h3 className="font-extrabold text-base leading-tight text-brand-brown font-display mt-0.5">Pantau Tumbuh Kembang Buah Hati Anda</h3>
+                          <p className="text-[10px] font-semibold text-brand-brown/70 leading-relaxed mt-1">
+                            Dapatkan akses ke grafik CDC/WHO secara presisi, milestone motorik, skrining KPSP mandiri, serta resep stimulasi harian dari psikolog & dokter spesialis.
+                          </p>
                         </div>
-
-                        {/* Flat horizontal metrics grid */}
-                        <div className="grid grid-cols-3 gap-1 bg-[#FFF9EE] rounded-2xl p-2.5 text-center text-[10px] font-bold text-brand-brown border border-orange-100/10">
-                          <div>
-                            <div className="text-[7px] text-brand-brown/50 font-black tracking-wider mb-0.5">Berat</div>
-                            <div className="text-xs font-black text-brand-orange">{latestGrowth ? `${latestGrowth.weightKg} kg` : '-'}</div>
-                          </div>
-                          <div className="border-x border-orange-100/35">
-                            <div className="text-[7px] text-brand-brown/50 font-black tracking-wider mb-0.5">Tinggi</div>
-                            <div className="text-xs font-black text-brand-orange">{latestGrowth ? `${latestGrowth.heightCm} cm` : '-'}</div>
-                          </div>
-                          <div>
-                            <div className="text-[7px] text-brand-brown/50 font-black tracking-wider mb-0.5">L.Kepala</div>
-                            <div className="text-xs font-black text-brand-orange">{latestGrowth ? `${latestGrowth.headCircumferenceCm} cm` : '-'}</div>
-                          </div>
-                        </div>
+                        <button
+                          onClick={() => {
+                            setAuthRedirectTab('home');
+                            setActiveTab('auth');
+                          }}
+                          className="w-full bg-brand-orange hover:bg-brand-orange/95 text-white py-2.5 rounded-xl text-xs font-extrabold shadow-sm shadow-orange-100/30 cursor-pointer text-center active:scale-98 transition-all"
+                        >
+                          Mulai Sekarang (Gratis)
+                        </button>
                       </div>
-
-                      {/* Growth Arc SVG inside header - Signature visual Moment */}
-                      <div className="relative w-24 h-24 shrink-0 flex items-center justify-center bg-[#FFF9EE] rounded-full p-1.5 border border-orange-100/20">
-                        <svg className="absolute inset-0 w-full h-full transform -rotate-90">
-                          {/* Outer Track Arc */}
-                          <circle
-                            cx="48"
-                            cy="48"
-                            r="36"
-                            className="stroke-orange-100 fill-none"
-                            strokeWidth="5"
-                            strokeDasharray="226"
-                            strokeDashoffset="56" /* Represents half-circle arcs */
-                          />
-                          {/* Inner Active Sunrise Arc */}
-                          <circle
-                            cx="48"
-                            cy="48"
-                            r="36"
-                            className="stroke-brand-orange fill-none"
-                            strokeWidth="5.5"
-                            strokeDasharray="226"
-                            strokeDashoffset="100" /* Represents simulated completed progress percentage */
-                            strokeLinecap="round"
-                          />
-                        </svg>
-                        
-                        {/* Display Center text */}
-                        <div className="text-center z-10 flex flex-col justify-center items-center">
-                          <span className="text-xs font-black text-brand-orange">85%</span>
-                          <span className="text-[8px] tracking-widest text-brand-brown/65 font-bold leading-none mt-0.5">Milestone</span>
-                        </div>
-                      </div>
-
-                    </div>
+                    )}
 
                   </div>
 
@@ -409,7 +467,7 @@ export default function App() {
                         
                         {/* 1. Growth */}
                         <button
-                          onClick={() => setActiveTab('growth')}
+                          onClick={() => handleTabClick('growth')}
                           className="bg-white hover:bg-orange-50/20 p-2.5 rounded-2xl text-left border border-orange-100/10 shadow-cocoa-resting flex flex-col justify-between h-[96px] cursor-pointer transition-all hover:scale-101"
                         >
                           <div className="w-7 h-7 rounded-lg bg-orange-50 text-brand-orange flex items-center justify-center shadow-cocoa-resting/5">
@@ -420,10 +478,10 @@ export default function App() {
                             <p className="text-[8px] text-brand-brown/45 font-bold line-clamp-1 mt-1">WHO & CDC</p>
                           </div>
                         </button>
-
+ 
                         {/* 2. Milestones */}
                         <button
-                          onClick={() => setActiveTab('milestone')}
+                          onClick={() => handleTabClick('milestone')}
                           className="bg-white hover:bg-orange-50/20 p-2.5 rounded-2xl text-left border border-orange-100/10 shadow-cocoa-resting flex flex-col justify-between h-[96px] cursor-pointer transition-all hover:scale-101"
                         >
                           <div className="w-7 h-7 rounded-lg bg-orange-50 text-brand-orange flex items-center justify-center shadow-cocoa-resting/5">
@@ -434,10 +492,10 @@ export default function App() {
                             <p className="text-[8px] text-brand-brown/45 font-bold line-clamp-1 mt-1">Cek Motorik</p>
                           </div>
                         </button>
-
+ 
                         {/* 3. Vaccine */}
                         <button
-                          onClick={() => setActiveTab('vaccine')}
+                          onClick={() => handleTabClick('vaccine')}
                           className="bg-white hover:bg-orange-50/20 p-2.5 rounded-2xl text-left border border-orange-100/10 shadow-cocoa-resting flex flex-col justify-between h-[96px] cursor-pointer transition-all hover:scale-101"
                         >
                           <div className="w-7 h-7 rounded-lg bg-orange-50 text-brand-orange flex items-center justify-center shadow-cocoa-resting/5">
@@ -448,10 +506,10 @@ export default function App() {
                             <p className="text-[8px] text-brand-brown/45 font-bold line-clamp-1 mt-1">IDAI & Kemenkes</p>
                           </div>
                         </button>
-
+ 
                         {/* 4. Screening */}
                         <button
-                          onClick={() => setActiveTab('screening')}
+                          onClick={() => handleTabClick('screening')}
                           className="bg-white hover:bg-orange-50/20 p-2.5 rounded-2xl text-left border border-orange-100/10 shadow-cocoa-resting flex flex-col justify-between h-[96px] cursor-pointer transition-all hover:scale-101"
                         >
                           <div className="w-7 h-7 rounded-lg bg-orange-50 text-brand-orange flex items-center justify-center shadow-cocoa-resting/5">
@@ -462,10 +520,10 @@ export default function App() {
                             <p className="text-[8px] text-brand-brown/45 font-bold line-clamp-1 mt-1">KPSP Mandiri</p>
                           </div>
                         </button>
-
+ 
                         {/* 5. Stimulasi */}
                         <button
-                          onClick={() => setActiveTab('stimulasi')}
+                          onClick={() => handleTabClick('stimulasi')}
                           className="bg-white hover:bg-orange-50/20 p-2.5 rounded-2xl text-left border border-orange-100/10 shadow-cocoa-resting flex flex-col justify-between h-[96px] cursor-pointer transition-all hover:scale-101"
                         >
                           <div className="w-7 h-7 rounded-lg bg-orange-50 text-brand-orange flex items-center justify-center shadow-cocoa-resting/5">
@@ -476,10 +534,10 @@ export default function App() {
                             <p className="text-[8px] text-brand-brown/45 font-bold line-clamp-1 mt-1">Main & Belajar</p>
                           </div>
                         </button>
-
+ 
                         {/* 6. Tanya Ahli */}
                         <button
-                          onClick={() => setActiveTab('qa')}
+                          onClick={() => handleTabClick('qa')}
                           className="bg-white hover:bg-orange-50/20 p-2.5 rounded-2xl text-left border border-orange-100/10 shadow-cocoa-resting flex flex-col justify-between h-[96px] cursor-pointer transition-all hover:scale-101"
                         >
                           <div className="w-7 h-7 rounded-lg bg-orange-50 text-brand-orange flex items-center justify-center shadow-cocoa-resting/5">
@@ -490,10 +548,10 @@ export default function App() {
                             <p className="text-[8px] text-brand-brown/45 font-bold line-clamp-1 mt-1">Konsul Dokter</p>
                           </div>
                         </button>
-
+ 
                         {/* 7. Library */}
                         <button
-                          onClick={() => setActiveTab('library')}
+                          onClick={() => handleTabClick('library')}
                           className="bg-white hover:bg-orange-50/20 p-2.5 rounded-2xl text-left border border-orange-100/10 shadow-cocoa-resting flex flex-col justify-between h-[96px] cursor-pointer transition-all hover:scale-101"
                         >
                           <div className="w-7 h-7 rounded-lg bg-orange-50 text-brand-orange flex items-center justify-center shadow-cocoa-resting/5">
@@ -504,10 +562,10 @@ export default function App() {
                             <p className="text-[8px] text-brand-brown/45 font-bold line-clamp-1 mt-1">Artikel Medis</p>
                           </div>
                         </button>
-
+ 
                         {/* 8. Booking */}
                         <button
-                          onClick={() => setActiveTab('booking')}
+                          onClick={() => handleTabClick('booking')}
                           className="bg-white hover:bg-orange-50/20 p-2.5 rounded-2xl text-left border border-orange-100/10 shadow-cocoa-resting flex flex-col justify-between h-[96px] cursor-pointer transition-all hover:scale-101"
                         >
                           <div className="w-7 h-7 rounded-lg bg-orange-50 text-brand-orange flex items-center justify-center shadow-cocoa-resting/5">
@@ -575,40 +633,43 @@ export default function App() {
                         {getSubPageTitle(activeTab)}
                       </h2>
                       <p className="text-[9px] text-brand-brown/45 font-bold tracking-wider">
-                        FlourishCare &bull; {activeChild.name}
+                        FlourishCare &bull; {activeChild?.name || 'Tumbuh Kembang'}
                       </p>
                     </div>
                   </div>
 
                   {/* Dynamic Render of Active Component Tab inside the App Bezel */}
                   <div className="flex-1 px-4 py-5 bg-[#FFFDF0]">
-                    {activeTab === 'growth' && (
+                    {activeTab === 'growth' && activeChild && (
                       <GrowthChart child={activeChild} onRefreshStats={() => fetchLatestGrowth(activeChild.id)} />
                     )}
-                    {activeTab === 'milestone' && (
+                    {activeTab === 'milestone' && activeChild && (
                       <MilestoneTracker child={activeChild} onNavigateToScreening={() => setActiveTab('screening')} />
                     )}
-                    {activeTab === 'vaccine' && (
+                    {activeTab === 'vaccine' && activeChild && (
                       <ImmunizationScheduler child={activeChild} />
                     )}
-                    {activeTab === 'screening' && (
+                    {activeTab === 'screening' && activeChild && (
                       <ScreeningHub child={activeChild} onNavigateToBooking={handleNavigateToBooking} />
                     )}
-                    {activeTab === 'stimulasi' && (
+                    {activeTab === 'stimulasi' && activeChild && (
                       <AktivitasStimulasi child={activeChild} />
                     )}
-                    {activeTab === 'qa' && (
+                    {activeTab === 'qa' && activeChild && (
                       <TanyaAhli child={activeChild} />
                     )}
                     {activeTab === 'library' && (
                       <ContentLibrary />
                     )}
-                    {activeTab === 'booking' && (
+                    {activeTab === 'booking' && activeChild && (
                       <BookingHub 
                         child={activeChild} 
                         preSelectedService={preSelectedService} 
                         preSelectedTherapistId={preSelectedTherapist} 
                       />
+                    )}
+                    {activeTab === 'auth' && (
+                      <Auth inline={true} onAuthSuccess={handleAuthSuccess} onBack={() => setActiveTab('home')} />
                     )}
                   </div>
 
@@ -625,7 +686,7 @@ export default function App() {
           
           {/* TAB 1: Home */}
           <button
-            onClick={() => setActiveTab('home')}
+            onClick={() => handleTabClick('home')}
             className="flex flex-col items-center justify-center w-12 h-full cursor-pointer transition-all relative"
           >
             <Home className={`w-5 h-5 ${activeTab === 'home' ? 'text-brand-orange stroke-[2.5]' : 'text-[#7A4C3D]/45'}`} />
@@ -637,7 +698,7 @@ export default function App() {
 
           {/* TAB 2: Milestones */}
           <button
-            onClick={() => setActiveTab('milestone')}
+            onClick={() => handleTabClick('milestone')}
             className="flex flex-col items-center justify-center w-12 h-full cursor-pointer transition-all relative"
           >
             <Footprints className={`w-5 h-5 ${(activeTab === 'milestone' || activeTab === 'screening') ? 'text-brand-orange stroke-[2.5]' : 'text-[#7A4C3D]/45'}`} />
@@ -649,7 +710,7 @@ export default function App() {
 
           {/* TAB 3: Stimulasi */}
           <button
-            onClick={() => setActiveTab('stimulasi')}
+            onClick={() => handleTabClick('stimulasi')}
             className="flex flex-col items-center justify-center w-12 h-full cursor-pointer transition-all relative"
           >
             <Puzzle className={`w-5 h-5 ${activeTab === 'stimulasi' ? 'text-brand-orange stroke-[2.5]' : 'text-[#7A4C3D]/45'}`} />
@@ -661,7 +722,7 @@ export default function App() {
 
           {/* TAB 4: Tanya Ahli */}
           <button
-            onClick={() => setActiveTab('qa')}
+            onClick={() => handleTabClick('qa')}
             className="flex flex-col items-center justify-center w-12 h-full cursor-pointer transition-all relative"
           >
             <MessageSquare className={`w-5 h-5 ${(activeTab === 'qa' || activeTab === 'library') ? 'text-brand-orange stroke-[2.5]' : 'text-[#7A4C3D]/45'}`} />
@@ -673,7 +734,7 @@ export default function App() {
 
           {/* TAB 5: Booking */}
           <button
-            onClick={() => setActiveTab('booking')}
+            onClick={() => handleTabClick('booking')}
             className="flex flex-col items-center justify-center w-12 h-full cursor-pointer transition-all relative"
           >
             <CalendarCheck className={`w-5 h-5 ${activeTab === 'booking' ? 'text-brand-orange stroke-[2.5]' : 'text-[#7A4C3D]/45'}`} />
