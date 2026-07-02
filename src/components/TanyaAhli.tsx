@@ -114,7 +114,7 @@ export default function TanyaAhli({ child }: TanyaAhliProps) {
     if (!selectedAdminQuestion || !adminAnswerText.trim()) return;
 
     try {
-      const response = await fetch(`/api/questions/${selectedAdminQuestion.id}/answer`, {
+      const response = await apiFetch(`/api/questions/${selectedAdminQuestion.id}/answer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -139,7 +139,7 @@ export default function TanyaAhli({ child }: TanyaAhliProps) {
     setIsGeneratingAi(true);
     setAdminAnswerText('Menganalisis pertanyaan klinis & menyusun rekomendasi...');
     try {
-      const response = await fetch('/api/questions/answer-ai', {
+      const response = await apiFetch('/api/questions/answer-ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ questionId: selectedAdminQuestion.id })
