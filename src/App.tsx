@@ -41,10 +41,13 @@ import AktivitasStimulasi from './components/AktivitasStimulasi';
 import TanyaAhli from './components/TanyaAhli';
 import BookingHub from './components/BookingHub';
 import FlourishCareLogo from './components/FlourishCareLogo';
+import Auth from './components/Auth';
 
 import { Child, UserProfile as Profile, GrowthRecord } from './types';
+import { apiFetch } from './api';
 
 export default function App() {
+  const [token, setToken] = useState<string | null>(localStorage.getItem('auth_token'));
   const [profile, setProfile] = useState<Profile | null>(null);
   const [children, setChildren] = useState<Child[]>([]);
   const [activeChild, setActiveChild] = useState<Child | null>(null);
@@ -75,7 +78,11 @@ export default function App() {
   const [currentTime, setCurrentTime] = useState('09:41');
 
   useEffect(() => {
-    fetchInitialData();
+    if (token) {
+      fetchInitialData();
+    } else {
+      setLoading(false);
+    }
     
     // Update Clock every minute to look completely like a real native phone
     const updateClock = () => {
@@ -86,15 +93,32 @@ export default function App() {
     };
     updateClock();
     const interval = setInterval(updateClock, 60000);
-    return () => clearInterval(interval);
-  }, []);
+    return () => {
+      clearInterval(interval);
+    };
+  }, [token]);
+
+  const handleAuthSuccess = (user: Profile, authToken: string) => {
+    setProfile(user);
+    setToken(authToken);
+    localStorage.setItem('auth_token', authToken);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('auth_token');
+    setProfile(null);
+    setToken(null);
+    setChildren([]);
+    setActiveChild(null);
+    setLatestGrowth(null);
+  };
 
   const fetchInitialData = async () => {
     setLoading(true);
     try {
       // Fetch Supabase status
       try {
-        const sRes = await fetch('/api/supabase-status');
+        const sRes = await apiFetch('/api/supabase-status');
         if (sRes.ok) {
           const sData = await sRes.json();
           setSupabaseStatus(sData);
@@ -104,14 +128,14 @@ export default function App() {
       }
 
       // 1. Fetch Profile
-      const profRes = await fetch('/api/profile');
+      const profRes = await apiFetch('/api/profile');
       if (profRes.ok) {
         const profData = await profRes.json();
         setProfile(profData);
       }
 
       // 2. Fetch Children List
-      const childRes = await fetch('/api/children');
+      const childRes = await apiFetch('/api/children');
       let childrenData: Child[] = [];
       if (childRes.ok) {
         childrenData = await childRes.json();
@@ -148,7 +172,7 @@ export default function App() {
 
   const fetchLatestGrowth = async (childId: string) => {
     try {
-      const growthRes = await fetch(`/api/growth/${childId}`);
+      const growthRes = await apiFetch(`/api/growth/${childId}`);
       if (growthRes.ok) {
         const records = await growthRes.json();
         if (records.length > 0) {
@@ -195,6 +219,11 @@ export default function App() {
         <p className="text-sm font-bold text-brand-brown/70">Menyiapkan Rumah Tumbuh Kembang...</p>
       </div>
     );
+  }
+
+  // If user is not authenticated, show premium Sign In / Sign Up screen
+  if (!token || !profile) {
+    return <Auth onAuthSuccess={handleAuthSuccess} />;
   }
 
   // If no children logged, force the beautiful onboarding questionnaire flow
@@ -267,12 +296,18 @@ export default function App() {
 
                       <div className="flex items-center gap-2.5">
                         <div className="text-right">
-                          <span className="block text-[10px] text-orange-100/90 font-semibold leading-tight">Halo Bunda</span>
+                          <span className="block text-[10px] text-orange-100/90 font-semibold leading-tight">
+                            Halo {profile?.role === 'caregiver' ? 'Wali' : 'Ayah/Bunda'}
+                          </span>
                           <span className="block text-xs font-extrabold text-[#FFFDE9] leading-none">{profile?.fullName.split(' ')[0] || 'Amanda'}</span>
                         </div>
-                        <div className="w-9 h-9 rounded-full border border-white/25 bg-white/10 shrink-0 flex items-center justify-center">
-                          <User className="w-4.5 h-4.5 text-brand-yellow" />
-                        </div>
+                        <button
+                          onClick={handleLogout}
+                          className="w-9 h-9 rounded-full border border-white/25 bg-white/10 shrink-0 flex items-center justify-center hover:bg-white/20 transition-all cursor-pointer active:scale-95"
+                          title="Keluar / Ganti Akun"
+                        >
+                          <LogOut className="w-4.5 h-4.5 text-brand-yellow" />
+                        </button>
                       </div>
                     </div>
 

@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { Sparkles, Heart, Baby, Calendar, ArrowRight, Activity, HelpCircle } from 'lucide-react';
 import { Child } from '../types';
 import FlourishCareLogo from './FlourishCareLogo';
+import { apiFetch } from '../api';
 
 interface OnboardingProps {
   onComplete: (child: Child) => void;
@@ -59,7 +60,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
 
       let newChild: any = null;
       try {
-        const response = await fetch('/api/children', {
+        const response = await apiFetch('/api/children', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(childPayload),

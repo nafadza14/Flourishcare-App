@@ -234,16 +234,73 @@ const PORT = 3000;
   // SUPABASE DATABASE DATA-ACCESS WRAPPERS
   // ==========================================
 
-  async function getProfile(): Promise<UserProfile> {
+  // Memory stores for multi-user support
+  interface UserAccount {
+    id: string;
+    email: string;
+    passwordHash: string;
+    fullName: string;
+    phoneWhatsapp: string;
+    city: string;
+    role: 'parent' | 'caregiver';
+    createdAt: string;
+  }
+
+  let userAccounts: UserAccount[] = [
+    {
+      id: 'u_amanda',
+      email: 'flourishcare.id@gmail.com',
+      passwordHash: 'password123',
+      fullName: 'Amanda Kartika',
+      phoneWhatsapp: '081234567890',
+      city: 'Jakarta Selatan',
+      role: 'parent',
+      createdAt: '2026-06-01T00:00:00.000Z'
+    }
+  ];
+
+  let userProfiles: UserProfile[] = [
+    {
+      id: 'u_amanda',
+      fullName: 'Amanda Kartika',
+      phoneWhatsapp: '081234567890',
+      email: 'flourishcare.id@gmail.com',
+      city: 'Jakarta Selatan',
+      role: 'parent',
+      createdAt: '2026-06-01T00:00:00.000Z'
+    }
+  ];
+
+  let notificationPreferencesList: NotificationPreferences[] = [
+    {
+      id: 'np_amanda',
+      parentId: 'u_amanda',
+      pushEnabled: true,
+      whatsappEnabled: true,
+      emailEnabled: true,
+      weeklyDigest: true,
+      immunizationReminder: true,
+      milestoneReminder: true
+    }
+  ];
+
+  function getUserId(req: Request): string {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      return authHeader.substring(7).trim();
+    }
+    return 'u_amanda'; // fallback
+  }
+
+  async function getProfile(userId: string): Promise<UserProfile> {
     try {
-      const { data, error } = await supabase.from('app_profiles').select('*').eq('id', 'u_amanda').single();
+      const { data, error } = await supabase.from('app_profiles').select('*').eq('id', userId).single();
       if (error) {
         if (error.code === 'PGRST116') {
-          console.log('Profile "u_amanda" not found in Supabase. Auto-seeding default profile...');
-          await updateProfile(activeProfile);
-          return activeProfile;
+          console.log(`Profile "${userId}" not found in Supabase.`);
+        } else {
+          throw error;
         }
-        throw error;
       }
       if (data) {
         return {
@@ -263,29 +320,59 @@ const PORT = 3000;
         console.warn('Supabase getProfile failed, using memory fallback:', err.message || err);
       }
     }
-    return activeProfile;
+    
+    const memProf = userProfiles.find(p => p.id === userId);
+    if (memProf) return memProf;
+    
+    // Create lazy default profile
+    const newProf: UserProfile = {
+      id: userId,
+      fullName: 'Ayah / Bunda',
+      phoneWhatsapp: '',
+      email: '',
+      city: '',
+      role: 'parent',
+      createdAt: new Date().toISOString()
+    };
+    userProfiles.push(newProf);
+    return newProf;
   }
 
-  async function updateProfile(update: Partial<UserProfile>): Promise<UserProfile> {
-    activeProfile = { ...activeProfile, ...update };
+  async function updateProfile(userId: string, update: Partial<UserProfile>): Promise<UserProfile> {
+    let existing = userProfiles.find(p => p.id === userId);
+    if (existing) {
+      Object.assign(existing, update);
+    } else {
+      existing = {
+        id: userId,
+        fullName: update.fullName || 'Ayah / Bunda',
+        phoneWhatsapp: update.phoneWhatsapp || '',
+        email: update.email || '',
+        city: update.city || '',
+        role: update.role || 'parent',
+        createdAt: new Date().toISOString()
+      };
+      userProfiles.push(existing);
+    }
+
     try {
       await supabase.from('app_profiles').upsert({
-        id: 'u_amanda',
-        full_name: activeProfile.fullName,
-        phone_whatsapp: activeProfile.phoneWhatsapp,
-        email: activeProfile.email,
-        city: activeProfile.city,
-        role: activeProfile.role,
+        id: userId,
+        full_name: existing.fullName,
+        phone_whatsapp: existing.phoneWhatsapp,
+        email: existing.email,
+        city: existing.city,
+        role: existing.role,
       });
     } catch (err: any) {
       console.warn('Supabase updateProfile failed, updated memory only:', err.message || err);
     }
-    return activeProfile;
+    return existing;
   }
 
-  async function getChildren(): Promise<Child[]> {
+  async function getChildren(userId: string): Promise<Child[]> {
     try {
-      const { data, error } = await supabase.from('app_children').select('*').eq('parent_id', 'u_amanda');
+      const { data, error } = await supabase.from('app_children').select('*').eq('parent_id', userId);
       if (error) throw error;
       if (data && data.length > 0) {
         return data.map(item => ({
@@ -308,7 +395,7 @@ const PORT = 3000;
         console.warn('Supabase getChildren failed, using memory fallback:', err.message || err);
       }
     }
-    return children;
+    return children.filter(c => c.parentId === userId);
   }
 
   async function saveChild(child: Child): Promise<void> {
@@ -612,9 +699,9 @@ const PORT = 3000;
     }
   }
 
-  async function getBookings(): Promise<Booking[]> {
+  async function getBookings(userId: string): Promise<Booking[]> {
     try {
-      const { data, error } = await supabase.from('app_bookings').select('*').eq('parent_id', 'u_amanda');
+      const { data, error } = await supabase.from('app_bookings').select('*').eq('parent_id', userId);
       if (error) throw error;
       if (data && data.length > 0) {
         return data.map(item => ({
@@ -642,7 +729,7 @@ const PORT = 3000;
         console.warn('Supabase getBookings failed, using memory fallback:', err.message || err);
       }
     }
-    return bookings.filter(b => b.parentId === 'u_amanda').sort((a,b) => b.scheduledAt.localeCompare(a.scheduledAt));
+    return bookings.filter(b => b.parentId === userId).sort((a,b) => b.scheduledAt.localeCompare(a.scheduledAt));
   }
 
   async function saveBooking(b: Booking): Promise<void> {
@@ -675,9 +762,9 @@ const PORT = 3000;
     }
   }
 
-  async function getNotifications(): Promise<Notification[]> {
+  async function getNotifications(userId: string): Promise<Notification[]> {
     try {
-      const { data, error } = await supabase.from('app_notifications').select('*').eq('parent_id', 'u_amanda');
+      const { data, error } = await supabase.from('app_notifications').select('*').eq('parent_id', userId);
       if (error) throw error;
       if (data && data.length > 0) {
         return data.map(item => ({
@@ -698,7 +785,7 @@ const PORT = 3000;
         console.warn('Supabase getNotifications failed, using memory fallback:', err.message || err);
       }
     }
-    return notifications.filter(n => n.parentId === 'u_amanda');
+    return notifications.filter(n => n.parentId === userId);
   }
 
   async function addNotification(n: Notification): Promise<void> {
@@ -719,33 +806,32 @@ const PORT = 3000;
     }
   }
 
-  async function markAllNotificationsRead(): Promise<void> {
+  async function markAllNotificationsRead(userId: string): Promise<void> {
     notifications.forEach(n => {
-      if (n.parentId === 'u_amanda') {
+      if (n.parentId === userId) {
         n.read = true;
       }
     });
     try {
-      await supabase.from('app_notifications').update({ read: true }).eq('parent_id', 'u_amanda');
+      await supabase.from('app_notifications').update({ read: true }).eq('parent_id', userId);
     } catch (err: any) {
       console.warn('Supabase markAllNotificationsRead failed, updated memory only:', err.message || err);
     }
   }
 
-  async function getPreferences(): Promise<NotificationPreferences> {
+  async function getPreferences(userId: string): Promise<NotificationPreferences> {
     try {
-      const { data, error } = await supabase.from('app_preferences').select('*').eq('parent_id', 'u_amanda').single();
+      const { data, error } = await supabase.from('app_preferences').select('*').eq('parent_id', userId).single();
       if (error) {
         if (error.code === 'PGRST116') {
-          console.log('Preferences not found in Supabase. Auto-seeding default preferences...');
-          await savePreferences(notificationPreferences);
-          return notificationPreferences;
+          console.log('Preferences not found in Supabase. Checking memory...');
+        } else {
+          throw error;
         }
-        throw error;
       }
       if (data) {
         return {
-          id: 'np_amanda',
+          id: data.id || 'np_' + userId,
           parentId: data.parent_id,
           pushEnabled: data.push_enabled,
           whatsappEnabled: data.whatsapp_enabled,
@@ -762,25 +848,47 @@ const PORT = 3000;
         console.warn('Supabase getPreferences failed, using memory fallback:', err.message || err);
       }
     }
-    return notificationPreferences;
+
+    const memPref = notificationPreferencesList.find(p => p.parentId === userId);
+    if (memPref) return memPref;
+
+    const newPref: NotificationPreferences = {
+      id: 'np_' + userId,
+      parentId: userId,
+      pushEnabled: true,
+      whatsappEnabled: true,
+      emailEnabled: true,
+      weeklyDigest: true,
+      immunizationReminder: true,
+      milestoneReminder: true
+    };
+    notificationPreferencesList.push(newPref);
+    return newPref;
   }
 
-  async function savePreferences(prefs: NotificationPreferences): Promise<NotificationPreferences> {
-    notificationPreferences = { ...notificationPreferences, ...prefs };
+  async function savePreferences(userId: string, prefs: NotificationPreferences): Promise<NotificationPreferences> {
+    let existing = notificationPreferencesList.find(p => p.parentId === userId);
+    if (existing) {
+      Object.assign(existing, prefs);
+    } else {
+      existing = { ...prefs, parentId: userId, id: 'np_' + userId };
+      notificationPreferencesList.push(existing);
+    }
+
     try {
       await supabase.from('app_preferences').upsert({
-        parent_id: prefs.parentId,
-        push_enabled: prefs.pushEnabled,
-        whatsapp_enabled: prefs.whatsappEnabled,
-        email_enabled: prefs.emailEnabled,
-        weekly_digest: prefs.weeklyDigest,
-        immunization_reminder: prefs.immunizationReminder,
-        milestone_reminder: prefs.milestoneReminder
+        parent_id: userId,
+        push_enabled: existing.pushEnabled,
+        whatsapp_enabled: existing.whatsappEnabled,
+        email_enabled: existing.emailEnabled,
+        weekly_digest: existing.weeklyDigest,
+        immunization_reminder: existing.immunizationReminder,
+        milestone_reminder: existing.milestoneReminder
       });
     } catch (err: any) {
       console.warn('Supabase savePreferences failed, updated memory only:', err.message || err);
     }
-    return notificationPreferences;
+    return existing;
   }
 
   // ==========================================
@@ -821,37 +929,152 @@ const PORT = 3000;
   });
 
   // Auth / Profile Endpoints
+  app.post('/api/auth/register', async (req: Request, res: Response) => {
+    try {
+      const { email, password, fullName, phoneWhatsapp, city, role } = req.body;
+      if (!email || !password || !fullName) {
+        return res.status(400).json({ error: 'Data registrasi tidak lengkap' });
+      }
+
+      // Check if email already registered
+      const cleanEmail = email.toLowerCase().trim();
+      const existing = userAccounts.find(u => u.email.toLowerCase() === cleanEmail);
+      if (existing) {
+        return res.status(400).json({ error: 'Email sudah terdaftar. Silakan masuk.' });
+      }
+
+      const userId = 'u_' + Date.now();
+      const newAccount: UserAccount = {
+        id: userId,
+        email: cleanEmail,
+        passwordHash: password,
+        fullName,
+        phoneWhatsapp: phoneWhatsapp || '',
+        city: city || '',
+        role: role || 'parent',
+        createdAt: new Date().toISOString()
+      };
+
+      userAccounts.push(newAccount);
+
+      // Create matching user profile
+      const newProfile: UserProfile = {
+        id: userId,
+        fullName: newAccount.fullName,
+        phoneWhatsapp: newAccount.phoneWhatsapp,
+        email: newAccount.email,
+        city: newAccount.city,
+        role: newAccount.role,
+        createdAt: newAccount.createdAt
+      };
+      userProfiles.push(newProfile);
+
+      // Save to Supabase if connected
+      try {
+        await supabase.from('app_profiles').upsert({
+          id: userId,
+          full_name: newProfile.fullName,
+          phone_whatsapp: newProfile.phoneWhatsapp,
+          email: newProfile.email,
+          city: newProfile.city,
+          role: newProfile.role,
+        });
+      } catch (sbErr) {
+        console.warn('Could not save registered profile to Supabase, using local memory storage only.');
+      }
+
+      // Seed automatic initial notification preference
+      const newPref: NotificationPreferences = {
+        id: 'np_' + userId,
+        parentId: userId,
+        pushEnabled: true,
+        whatsappEnabled: true,
+        emailEnabled: true,
+        weeklyDigest: true,
+        immunizationReminder: true,
+        milestoneReminder: true
+      };
+      notificationPreferencesList.push(newPref);
+
+      // Seed automatic welcome notification
+      const welcomeNotification: Notification = {
+        id: 'n_welcome_' + Date.now(),
+        parentId: userId,
+        type: 'weekly_digest',
+        title: `Selamat Datang, ${fullName.split(' ')[0]}!`,
+        body: `Terima kasih telah bergabung di FlourishCare. Mari bersama-sama mendampingi tumbuh kembang si kecil secara optimal dengan skrining klinis dan resep stimulasi terpercaya.`,
+        deepLink: 'home',
+        read: false,
+        createdAt: new Date().toISOString()
+      };
+      notifications.unshift(welcomeNotification);
+
+      res.status(201).json({
+        success: true,
+        user: newProfile,
+        token: userId
+      });
+    } catch (err: any) {
+      console.error('Error during registration:', err);
+      res.status(500).json({ error: 'Terjadi kesalahan sistem saat registrasi' });
+    }
+  });
+
+  app.post('/api/auth/login', async (req: Request, res: Response) => {
+    try {
+      const { email, password } = req.body;
+      if (!email || !password) {
+        return res.status(400).json({ error: 'Email dan password harus diisi' });
+      }
+
+      const cleanEmail = email.toLowerCase().trim();
+      const account = userAccounts.find(u => u.email.toLowerCase() === cleanEmail && u.passwordHash === password);
+      if (!account) {
+        return res.status(401).json({ error: 'Email atau password salah' });
+      }
+
+      const prof = await getProfile(account.id);
+
+      res.json({
+        success: true,
+        user: prof,
+        token: account.id
+      });
+    } catch (err: any) {
+      console.error('Error during login:', err);
+      res.status(500).json({ error: 'Terjadi kesalahan sistem saat masuk' });
+    }
+  });
+
+  app.post('/api/auth/logout', (req: Request, res: Response) => {
+    res.json({ success: true });
+  });
+
   app.get('/api/profile', async (req: Request, res: Response) => {
-    const prof = await getProfile();
+    const userId = getUserId(req);
+    const prof = await getProfile(userId);
     res.json(prof);
   });
 
   app.put('/api/profile', async (req: Request, res: Response) => {
-    const prof = await updateProfile(req.body);
+    const userId = getUserId(req);
+    const prof = await updateProfile(userId, req.body);
     res.json(prof);
   });
 
   // Children Endpoints
   app.get('/api/children', async (req: Request, res: Response) => {
-    const list = await getChildren();
+    const userId = getUserId(req);
+    const list = await getChildren(userId);
     res.json(list);
   });
 
   app.post('/api/children', async (req: Request, res: Response) => {
+    const userId = getUserId(req);
     try {
-      let parentId = 'u_amanda';
-      try {
-        const activeProf = await getProfile();
-        if (activeProf && activeProf.id) {
-          parentId = activeProf.id;
-        }
-      } catch (profileErr) {
-        console.warn('Error fetching profile for post-child, using fallback parent ID:', profileErr);
-      }
-
       const newChild: Child = {
         id: 'c_' + Date.now(),
-        parentId: parentId,
+        parentId: userId,
         name: req.body.name || 'Si Kecil',
         birthDate: req.body.birthDate || new Date().toISOString().split('T')[0],
         gender: req.body.gender || 'L',
@@ -866,7 +1089,7 @@ const PORT = 3000;
       console.error('Crash in POST /api/children:', err);
       const fallbackChild: Child = {
         id: 'c_fallback_' + Date.now(),
-        parentId: 'u_amanda',
+        parentId: userId,
         name: req.body.name || 'Si Kecil',
         birthDate: req.body.birthDate || new Date().toISOString().split('T')[0],
         gender: req.body.gender || 'L',
@@ -880,8 +1103,9 @@ const PORT = 3000;
   });
 
   app.put('/api/children/:id', async (req: Request, res: Response) => {
+    const userId = getUserId(req);
     const { id } = req.params;
-    const list = await getChildren();
+    const list = await getChildren(userId);
     const index = list.findIndex(c => c.id === id);
     if (index !== -1) {
       const updated = { ...list[index], ...req.body };
@@ -1021,7 +1245,8 @@ const PORT = 3000;
   });
 
   app.post('/api/screenings', async (req: Request, res: Response) => {
-    const activeProf = await getProfile();
+    const userId = getUserId(req);
+    const activeProf = await getProfile(userId);
     const screening: Screening = {
       id: 's_' + Date.now(),
       childId: req.body.childId,
@@ -1056,7 +1281,8 @@ const PORT = 3000;
 
   // Q&A / Tanya Ahli Endpoints
   app.get('/api/questions', async (req: Request, res: Response) => {
-    const activeProf = await getProfile();
+    const userId = getUserId(req);
+    const activeProf = await getProfile(userId);
     const list = await getQuestions();
     // Return all public questions plus active user's questions
     const filtered = list.filter(q => q.isPublic || q.parentId === activeProf.id);
@@ -1064,7 +1290,8 @@ const PORT = 3000;
   });
 
   app.post('/api/questions', async (req: Request, res: Response) => {
-    const activeProf = await getProfile();
+    const userId = getUserId(req);
+    const activeProf = await getProfile(userId);
     const parentId = activeProf.id;
     
     // Enforce Monthly Q&A limit (max 3 questions per month per user)
@@ -1203,7 +1430,8 @@ Draf jawaban harus sangat hangat, empatik, kredibel secara medis/psikologis, mem
   app.post('/api/questions/:id/answer', async (req: Request, res: Response) => {
     const { id } = req.params;
     const { expertId, answerText } = req.body;
-    const activeProf = await getProfile();
+    const userId = getUserId(req);
+    const activeProf = await getProfile(userId);
     const qList = await getQuestions();
     const index = qList.findIndex(q => q.id === id);
     if (index !== -1) {
@@ -1237,12 +1465,13 @@ Draf jawaban harus sangat hangat, empatik, kredibel secara medis/psikologis, mem
 
   // Clinical Bookings Endpoints
   app.get('/api/bookings', async (req: Request, res: Response) => {
-    const list = await getBookings();
+    const userId = getUserId(req);
+    const list = await getBookings(userId);
     res.json(list);
   });
 
   app.post('/api/bookings', async (req: Request, res: Response) => {
-    const activeProf = await getProfile();
+    const userId = getUserId(req);
     const code = 'FC-' + req.body.serviceType.toUpperCase().substring(0,2) + '-' + Math.floor(1000 + Math.random() * 9000);
     const amountMap: Record<string, number> = {
       'onsite': 250000,
@@ -1254,7 +1483,7 @@ Draf jawaban harus sangat hangat, empatik, kredibel secara medis/psikologis, mem
 
     const newBooking: Booking = {
       id: 'b_' + Date.now(),
-      parentId: activeProf.id,
+      parentId: userId,
       childId: req.body.childId,
       serviceType: req.body.serviceType,
       subService: req.body.subService,
@@ -1275,7 +1504,7 @@ Draf jawaban harus sangat hangat, empatik, kredibel secara medis/psikologis, mem
     // Create a pending booking notification
     const newNotif: Notification = {
       id: 'n_' + Date.now(),
-      parentId: activeProf.id,
+      parentId: userId,
       type: 'booking',
       title: 'Booking Berhasil Dibuat',
       body: `Booking ${newBooking.subService} untuk anak Anda telah dibuat. Selesaikan pembayaran DP/Lunas untuk konfirmasi jadwal. Kode: ${newBooking.bookingCode}`,
@@ -1290,8 +1519,8 @@ Draf jawaban harus sangat hangat, empatik, kredibel secara medis/psikologis, mem
 
   app.post('/api/bookings/:id/pay', async (req: Request, res: Response) => {
     const { id } = req.params;
-    const activeProf = await getProfile();
-    const list = await getBookings();
+    const userId = getUserId(req);
+    const list = await getBookings(userId);
     const index = list.findIndex(b => b.id === id);
     if (index !== -1) {
       const updated = {
@@ -1304,7 +1533,7 @@ Draf jawaban harus sangat hangat, empatik, kredibel secara medis/psikologis, mem
       // Notify payment successful
       const newNotif: Notification = {
         id: 'n_' + Date.now(),
-        parentId: activeProf.id,
+        parentId: userId,
         type: 'booking',
         title: 'Pembayaran Dikonfirmasi!',
         body: `Pembayaran Rp ${updated.amount.toLocaleString('id-ID')} untuk booking ${updated.subService} telah diverifikasi. Sampai jumpa di klinik!`,
@@ -1322,7 +1551,8 @@ Draf jawaban harus sangat hangat, empatik, kredibel secara medis/psikologis, mem
 
   app.post('/api/bookings/:id/cancel', async (req: Request, res: Response) => {
     const { id } = req.params;
-    const list = await getBookings();
+    const userId = getUserId(req);
+    const list = await getBookings(userId);
     const index = list.findIndex(b => b.id === id);
     if (index !== -1) {
       const updated = {
@@ -1338,23 +1568,27 @@ Draf jawaban harus sangat hangat, empatik, kredibel secara medis/psikologis, mem
 
   // Notifications Endpoints
   app.get('/api/notifications', async (req: Request, res: Response) => {
-    const list = await getNotifications();
+    const userId = getUserId(req);
+    const list = await getNotifications(userId);
     res.json(list);
   });
 
   app.post('/api/notifications/read-all', async (req: Request, res: Response) => {
-    await markAllNotificationsRead();
+    const userId = getUserId(req);
+    await markAllNotificationsRead(userId);
     res.json({ success: true });
   });
 
   // Preferences Endpoints
   app.get('/api/preferences', async (req: Request, res: Response) => {
-    const prefs = await getPreferences();
+    const userId = getUserId(req);
+    const prefs = await getPreferences(userId);
     res.json(prefs);
   });
 
   app.put('/api/preferences', async (req: Request, res: Response) => {
-    const prefs = await savePreferences(req.body);
+    const userId = getUserId(req);
+    const prefs = await savePreferences(userId, req.body);
     res.json(prefs);
   });
 

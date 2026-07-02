@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { Child, Booking } from '../types';
 import { CLINICAL_EXPERTS } from '../data/seedData';
+import { apiFetch } from '../api';
 
 interface Expert {
   id: string;
@@ -107,7 +108,7 @@ export default function BookingHub({ child, preSelectedService = 'onsite', preSe
     setLoading(true);
 
     try {
-      const response = await fetch('/api/bookings', {
+      const response = await apiFetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

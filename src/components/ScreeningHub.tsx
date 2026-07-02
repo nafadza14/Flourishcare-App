@@ -16,6 +16,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { Child, Screening, ScreeningType } from '../types';
+import { apiFetch } from '../api';
 
 interface ScreeningHubProps {
   child: Child;
@@ -86,7 +87,7 @@ export default function ScreeningHub({ child, onNavigateToBooking }: ScreeningHu
   const fetchScreeningHistory = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/screenings/${child.id}`);
+      const response = await apiFetch(`/api/screenings/${child.id}`);
       if (response.ok) {
         const data = await response.json();
         setScreeningsHistory(data);
@@ -170,7 +171,7 @@ export default function ScreeningHub({ child, onNavigateToBooking }: ScreeningHu
     }
 
     try {
-      const response = await fetch('/api/screenings', {
+      const response = await apiFetch('/api/screenings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

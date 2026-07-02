@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Child, Question } from '../types';
 import { CLINICAL_EXPERTS } from '../data/seedData';
+import { apiFetch } from '../api';
 
 interface TanyaAhliProps {
   child: Child;
@@ -47,7 +48,7 @@ export default function TanyaAhli({ child }: TanyaAhliProps) {
   const fetchQuestions = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/questions');
+      const response = await apiFetch('/api/questions');
       if (response.ok) {
         const data = await response.json();
         setQuestions(data);
@@ -80,7 +81,7 @@ export default function TanyaAhli({ child }: TanyaAhliProps) {
     setLoading(true);
 
     try {
-      const response = await fetch('/api/questions', {
+      const response = await apiFetch('/api/questions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
