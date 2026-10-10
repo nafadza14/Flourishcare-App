@@ -13,6 +13,9 @@ export const LOGO_SRC = {
   wordmark: '/brand/logo-wordmark.png',
 } as const;
 
+/** Home screen icon (bump ?v= when the icon files change, so phones fetch the new one) */
+export const APP_ICON_SRC = '/icons/icon-192.png?v=2';
+
 interface FlourishCareLogoProps {
   className?: string;
   variant?: keyof typeof LOGO_SRC;

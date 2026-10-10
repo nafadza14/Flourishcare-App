@@ -4,7 +4,7 @@ import { MonitorDown, X } from 'lucide-react';
 import { Button } from './ui/primitives';
 import { useToast } from './ui/Toast';
 import InstallGuideSheet from './sheets/InstallGuideSheet';
-import FlourishCareLogo from './FlourishCareLogo';
+import FlourishCareLogo, { APP_ICON_SRC } from './FlourishCareLogo';
 import { isSnoozed, snoozeInstall, useInstall } from '../lib/install';
 import { softSpring } from '../lib/motion';
 
@@ -83,7 +83,7 @@ export default function InstallBanner({ enabled }: { enabled: boolean }) {
             aria-label="Pasang aplikasi FlourishCare"
           >
             <div className="relative glass-white rounded-[24px] shadow-float border border-white/80 p-3 flex items-center gap-3">
-              <img src="/icons/icon-192.png" alt="" className="w-12 h-12 rounded-[13px] shadow-[0_2px_8px_rgba(35,27,22,0.14)] shrink-0" draggable={false} />
+              <img src={APP_ICON_SRC} alt="" className="w-12 h-12 rounded-[13px] shadow-[0_2px_8px_rgba(35,27,22,0.14)] shrink-0" draggable={false} />
               <div className="min-w-0 flex-1">
                 <div className="text-[15px] font-medium text-ink leading-tight">{title}</div>
                 <div className="text-[13.5px] text-mute leading-snug mt-0.5">{body}</div>

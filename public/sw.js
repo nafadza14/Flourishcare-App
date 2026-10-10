@@ -1,16 +1,28 @@
 /* FlourishCare service worker
  * - Navigations: network first, fall back to the cached app shell when offline
- * - Hashed build assets and icons: cache first
+ * - Hashed build assets (/assets/*) and fonts: cache first (their names change on every build)
+ * - Logo, icons and manifest: network first, cache only as offline fallback,
+ *   so a new logo shows up right away instead of staying stuck in the cache
  * - API requests: always network (never cached), so data stays fresh
  */
-const VERSION = 'flourishcare-v3';
-const SHELL = ['/', '/manifest.json', '/brand/logo-mark.png', '/brand/logo.png', '/icons/icon-192.png', '/icons/icon-512.png'];
+const VERSION = 'flourishcare-v4';
+const ICON_V = '2';
+const SHELL = [
+  '/',
+  '/manifest.json',
+  '/brand/logo-mark.png',
+  '/brand/logo.png',
+  '/brand/logo-wordmark.png',
+  `/icons/icon-192.png?v=${ICON_V}`,
+  `/icons/icon-512.png?v=${ICON_V}`,
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
       .open(VERSION)
-      .then((cache) => cache.addAll(SHELL).catch(() => undefined))
+      // cache: 'reload' skips the browser's HTTP cache, so an old logo can never be copied in
+      .then((cache) => cache.addAll(SHELL.map((url) => new Request(url, { cache: 'reload' }))).catch(() => undefined))
       .then(() => self.skipWaiting()),
   );
 });
@@ -24,6 +36,20 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+function networkFirst(request, cacheKey) {
+  // Navigations keep their own request; other files revalidate with the server every time
+  const live = request.mode === 'navigate' ? fetch(request) : fetch(request, { cache: 'no-cache' });
+  return live
+    .then((res) => {
+      if (res.ok) {
+        const copy = res.clone();
+        caches.open(VERSION).then((cache) => cache.put(cacheKey || request, copy)).catch(() => undefined);
+      }
+      return res;
+    })
+    .catch(() => caches.match(cacheKey || request).then((cached) => cached || Response.error()));
+}
+
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
@@ -32,19 +58,16 @@ self.addEventListener('fetch', (event) => {
   if (url.pathname.startsWith('/api/')) return;
 
   if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request)
-        .then((res) => {
-          const copy = res.clone();
-          caches.open(VERSION).then((cache) => cache.put('/', copy)).catch(() => undefined);
-          return res;
-        })
-        .catch(() => caches.match('/').then((cached) => cached || Response.error())),
-    );
+    event.respondWith(networkFirst(request, '/'));
     return;
   }
 
-  if (url.pathname.startsWith('/assets/') || url.pathname.startsWith('/icons/') || url.pathname.startsWith('/brand/') || url.pathname.endsWith('.woff2')) {
+  if (url.pathname.startsWith('/icons/') || url.pathname.startsWith('/brand/') || url.pathname === '/manifest.json' || url.pathname === '/logo.svg') {
+    event.respondWith(networkFirst(request));
+    return;
+  }
+
+  if (url.pathname.startsWith('/assets/') || url.pathname.endsWith('.woff2')) {
     event.respondWith(
       caches.match(request).then(
         (cached) =>

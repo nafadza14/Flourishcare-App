@@ -34,17 +34,73 @@ function uid(prefix: string): string {
   return `${prefix}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 }
 
+/**
+ * Values pasted into Vercel often carry extra characters: wrapping quotes copied from .env,
+ * the "NAME=" prefix, spaces or a trailing newline. Supabase rejects those as "Invalid API key".
+ */
+function cleanEnv(raw: string | undefined, name: string): { value: string; cleaned: boolean } {
+  if (!raw) return { value: '', cleaned: false };
+  let v = raw.trim();
+  v = v.replace(new RegExp(`^(export\\s+)?${name}\\s*=\\s*`), '');
+  v = v.replace(/^['"`]+|['"`;]+$/g, '').trim();
+  return { value: v, cleaned: v !== raw };
+}
+
 // Initialize Supabase Client safely with provided details
-const rawSupabaseUrl = process.env.SUPABASE_URL || 'https://vtquhqdfyirccxdzmpyr.supabase.co';
+const rawSupabaseUrl = cleanEnv(process.env.SUPABASE_URL, 'SUPABASE_URL').value || 'https://vtquhqdfyirccxdzmpyr.supabase.co';
 // Clean raw URL: strip trailing /rest/v1 or /rest/v1/ suffix if present
-const SUPABASE_URL = rawSupabaseUrl.replace(/\/rest\/v1\/?$/, '');
+const SUPABASE_URL = rawSupabaseUrl.replace(/\/rest\/v1\/?$/, '').replace(/\/+$/, '');
+const SUPABASE_PROJECT_REF = SUPABASE_URL.replace(/^https?:\/\//, '').split('.')[0];
 /** Publishable (anon) key: safe in the browser, used to verify user sessions. */
-const SUPABASE_KEY = process.env.SUPABASE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_rV4ay28GgXdI3TgnY3jkJA_YIVVJAKS';
+const SUPABASE_KEY =
+  cleanEnv(process.env.SUPABASE_KEY, 'SUPABASE_KEY').value ||
+  cleanEnv(process.env.SUPABASE_PUBLISHABLE_KEY, 'SUPABASE_PUBLISHABLE_KEY').value ||
+  'sb_publishable_rV4ay28GgXdI3TgnY3jkJA_YIVVJAKS';
 /**
  * Secret (service role) key: server only, never shipped to the browser.
  * The app tables have Row Level Security enabled, so data access needs this key.
  */
-const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const secretEnv = process.env.SUPABASE_SECRET_KEY
+  ? cleanEnv(process.env.SUPABASE_SECRET_KEY, 'SUPABASE_SECRET_KEY')
+  : cleanEnv(process.env.SUPABASE_SERVICE_ROLE_KEY, 'SUPABASE_SERVICE_ROLE_KEY');
+const SUPABASE_SECRET_KEY = secretEnv.value;
+
+/** Describes a key without revealing it, so a wrong value in Vercel can be spotted from /api/supabase-status. */
+function describeSecretKey(key: string, cleaned: boolean) {
+  if (!key) return { format: 'kosong', warning: 'SUPABASE_SECRET_KEY belum diisi di Vercel.' };
+  const info: { format: string; length: number; cleaned?: boolean; project?: string; warning?: string } = { format: 'tidak dikenali', length: key.length };
+  if (cleaned) info.cleaned = true;
+  if (/[^\x21-\x7E]/.test(key)) {
+    info.warning = 'Ada karakter yang tidak valid (spasi, titik sensor, atau baris baru). Salin ulang memakai tombol salin di Supabase.';
+  }
+  if (key.startsWith('sb_secret_')) {
+    info.format = 'secret key (sb_secret_)';
+    if (!info.warning && key.length < 40) info.warning = 'Secret key terlalu pendek, kemungkinan terpotong saat disalin.';
+  } else if (key.startsWith('sb_publishable_')) {
+    info.format = 'publishable key';
+    info.warning = 'Ini publishable key, bukan secret key. Ambil dari bagian Secret keys.';
+  } else if (key.split('.').length === 3) {
+    try {
+      const payload = JSON.parse(Buffer.from(key.split('.')[1], 'base64url').toString('utf8'));
+      info.format = `JWT legacy (role: ${payload.role || '?'})`;
+      if (payload.ref) info.project = payload.ref;
+      if (payload.role !== 'service_role') info.warning = 'Ini bukan service_role key. Pakai secret key atau service_role.';
+      else if (payload.ref && payload.ref !== SUPABASE_PROJECT_REF) info.warning = `Key ini milik project lain (${payload.ref}), bukan ${SUPABASE_PROJECT_REF}.`;
+    } catch {
+      info.format = 'JWT tidak terbaca';
+      info.warning = 'Key terpotong atau rusak. Salin ulang dari Supabase.';
+    }
+  } else if (!info.warning) {
+    info.warning = 'Format tidak dikenali. Secret key Supabase diawali sb_secret_ (atau eyJ untuk service_role legacy).';
+  }
+  return info;
+}
+
+{
+  const check = describeSecretKey(SUPABASE_SECRET_KEY, secretEnv.cleaned);
+  if (check.warning) console.warn(`[supabase] ${check.warning}`);
+  if (secretEnv.cleaned) console.warn('[supabase] SUPABASE_SECRET_KEY berisi tanda kutip atau spasi, sudah dibersihkan otomatis.');
+}
 
 /** Development helpers. Both stay off in production (Vercel). */
 const DEMO_SEED = process.env.DEMO_SEED === 'true';
@@ -1198,7 +1254,7 @@ const PORT = Number(process.env.PORT) || 3000;
 
   // Supabase Connection Health Status (no secrets in the response)
   app.get('/api/supabase-status', async (_req: Request, res: Response) => {
-    const base = { project: SUPABASE_URL.replace(/^https?:\/\//, '').split('.')[0], secretKey: !!SUPABASE_SECRET_KEY };
+    const base = { project: SUPABASE_PROJECT_REF, secretKey: !!SUPABASE_SECRET_KEY, secretKeyCheck: describeSecretKey(SUPABASE_SECRET_KEY, secretEnv.cleaned) };
     try {
       const { error } = await supabase.from('app_profiles').select('id').limit(1);
       if (error) {
@@ -1211,7 +1267,9 @@ const PORT = Number(process.env.PORT) || 3000;
           hint: missing
             ? 'Tabel aplikasi belum ada. Jalankan skema SQL (menu Akun, Tentang FlourishCare) di Supabase SQL Editor.'
             : SUPABASE_SECRET_KEY
-              ? 'Periksa SUPABASE_SECRET_KEY di Vercel.'
+              ? /invalid api key|jwt|unauthorized/i.test(error.message || '')
+                ? 'SUPABASE_SECRET_KEY di Vercel ditolak Supabase. Salin ulang dari Supabase > Project Settings > API Keys > Secret keys (tombol salin), simpan di Vercel tanpa tanda kutip, lalu Redeploy.'
+                : 'Periksa SUPABASE_SECRET_KEY di Vercel.'
               : 'Tambahkan SUPABASE_SECRET_KEY di Vercel agar server bisa membaca tabel yang dilindungi RLS.',
         });
       }

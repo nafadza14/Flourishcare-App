@@ -4,6 +4,7 @@ import Sheet from '../ui/Sheet';
 import { Button } from '../ui/primitives';
 import { useToast } from '../ui/Toast';
 import { APP_URL, useInstall, type GuideMode } from '../../lib/install';
+import { APP_ICON_SRC } from '../FlourishCareLogo';
 
 /** A browser button, drawn inline in the instructions so parents know what to look for */
 function Key({ icon: Icon, label }: { icon: LucideIcon; label?: string }) {
@@ -35,7 +36,7 @@ function Preview() {
   return (
     <div className="mt-1 rounded-[22px] bg-brand-orange-soft/60 border border-line p-4 flex items-center gap-4">
       <div className="flex flex-col items-center shrink-0 w-[76px]">
-        <img src="/icons/icon-192.png" alt="" className="w-[60px] h-[60px] rounded-[15px] shadow-[0_4px_12px_rgba(35,27,22,0.16)]" />
+        <img src={APP_ICON_SRC} alt="" className="w-[60px] h-[60px] rounded-[15px] shadow-[0_4px_12px_rgba(35,27,22,0.16)]" />
         <span className="text-[12px] text-ink mt-1.5 truncate max-w-full">FlourishCare</span>
       </div>
       <ul className="space-y-1.5 min-w-0">

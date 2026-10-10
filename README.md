@@ -30,7 +30,7 @@ Vite 6, React 19, TypeScript, Tailwind CSS v4, Motion (motion/react), lucide-rea
    - `http://localhost:3000/**` (untuk uji di komputer)
 3. **Supabase > Authentication > Providers > Google**: pastikan aktif (sudah dipakai www dan book).
 4. **Vercel > Project Settings > Environment Variables**: isi `SUPABASE_SECRET_KEY` (Supabase > Project Settings > API Keys > Secret keys). Lalu redeploy.
-5. Cek: buka app.flourishcare.id/api/supabase-status. Harus `"tablesReady": true` dan `"secretKey": true`.
+5. Cek: buka app.flourishcare.id/api/supabase-status. Harus `"connected": true` dan `"tablesReady": true`. Kalau muncul `"Invalid API key"`, nilai secret key salah: lihat `secretKeyCheck` (format dan panjang key, tanpa membocorkan isinya), salin ulang memakai tombol salin di Supabase, simpan tanpa tanda kutip, lalu Redeploy.
 
 Di Vercel, server tidak pernah menyimpan data ke memori (data akan hilang di instance berikutnya). Kalau database belum siap, API menjawab 503 dan aplikasi menampilkan pesan, bukan meminta orang tua mengisi ulang data.
 
