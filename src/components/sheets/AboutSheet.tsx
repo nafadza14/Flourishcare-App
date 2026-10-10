@@ -46,10 +46,9 @@ export default function AboutSheet({ open, onClose, showAdmin = false }: { open:
       <div className="space-y-4 pt-1">
         <div className="flex flex-col items-center text-center py-2">
           <motion.div initial={{ scale: 0.8, rotate: -8 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 260, damping: 16 }}>
-            <FlourishCareLogo className="w-20 h-20" animated />
+            <FlourishCareLogo variant="full" className="w-44 h-auto" animated />
           </motion.div>
-          <div className="text-[22px] mt-2">FlourishCare</div>
-          <div className="text-[14px] text-mute">Aplikasi tumbuh kembang anak · versi {APP_VERSION}</div>
+          <div className="text-[14px] text-mute mt-2">Aplikasi tumbuh kembang anak · versi {APP_VERSION}</div>
         </div>
         <p className="text-[16px] text-ink-2 leading-relaxed">
           FlourishCare membantu Ayah Bunda memantau pertumbuhan, milestone, imunisasi, dan skrining dini si Kecil. Saat butuh bantuan lebih, psikolog dan terapis FlourishCare di Klinik Mitra Diani, Jakarta Timur, siap mendampingi.

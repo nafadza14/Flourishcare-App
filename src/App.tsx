@@ -37,11 +37,10 @@ function Splash() {
       transition={{ duration: 0.4, ease: [0.32, 0.72, 0, 1] }}
     >
       <motion.div initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 220, damping: 16 }}>
-        <FlourishCareLogo className="w-24 h-24" animated />
+        <FlourishCareLogo variant="full" className="w-56 h-auto" animated alt="FlourishCare" />
       </motion.div>
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="mt-4 text-center">
-        <div className="text-[24px] tracking-[-0.01em]">FlourishCare</div>
-        <div className="text-[15px] text-mute mt-1">Setiap anak berhak tumbuh sepenuhnya</div>
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="mt-3 text-center">
+        <div className="text-[15px] text-mute">Setiap anak berhak tumbuh sepenuhnya</div>
       </motion.div>
     </motion.div>
   );

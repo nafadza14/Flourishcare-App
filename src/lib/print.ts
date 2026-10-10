@@ -69,7 +69,8 @@ export function escapeHtml(value: string): string {
 }
 
 export function printHeader(subtitle: string, code?: string) {
-  return `<div class="head"><div class="brand"><div class="dot"></div><div><h1>FlourishCare</h1><div class="muted">${escapeHtml(subtitle)}</div></div></div>${
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  return `<div class="head"><div class="brand"><img src="${origin}/brand/logo.png" alt="FlourishCare" style="height:56px;width:auto" /><div><div class="muted">${escapeHtml(subtitle)}</div></div></div>${
     code ? `<div class="muted" style="text-align:right">Kode<br/><b style="color:#231B16">${escapeHtml(code)}</b></div>` : ''
   }</div>`;
 }

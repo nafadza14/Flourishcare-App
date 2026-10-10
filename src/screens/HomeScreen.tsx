@@ -189,10 +189,10 @@ function GuestHome() {
     <Screen title="Beranda" hideNav largeTitle={false} withTabBar bottomSpacer={false}>
       <div className="px-5 pt-3 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <FlourishCareLogo className="w-11 h-11" animated />
+          <FlourishCareLogo className="w-12 h-12" animated />
           <div>
-            <div className="text-[19px] leading-tight">FlourishCare</div>
-            <div className="text-[13px] text-mute">Aplikasi tumbuh kembang anak</div>
+            <FlourishCareLogo variant="wordmark" className="h-[21px] w-auto" alt="FlourishCare" />
+            <div className="text-[13px] text-mute mt-0.5">Aplikasi tumbuh kembang anak</div>
           </div>
         </div>
         <Button size="sm" variant="secondary" onClick={() => nav.push({ name: 'auth', mode: 'login' })}>

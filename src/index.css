@@ -72,6 +72,11 @@
   95% { transform: scaleY(0.1); }
 }
 
+@keyframes breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+
 @keyframes ray-breathe {
   0%, 100% { transform: scale(1); opacity: 1; }
   50% { transform: scale(1.07); opacity: 0.85; }
@@ -207,6 +212,7 @@
   .anim-float { animation: var(--animate-float); }
   .anim-blink { animation: blink 4.5s infinite; transform-origin: center; transform-box: fill-box; }
   .anim-rays { animation: ray-breathe 3.2s ease-in-out infinite; transform-origin: 50px 56px; transform-box: view-box; }
+  .anim-breathe { animation: breathe 3.6s ease-in-out infinite; transform-origin: 50% 60%; }
   .anim-pulse-dot { animation: pulse-dot 2s infinite; }
 
   .safe-top { padding-top: env(safe-area-inset-top); }
@@ -240,7 +246,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .anim-wiggle, .anim-float, .anim-blink, .anim-rays, .anim-pulse-dot, .skeleton { animation: none !important; }
+  .anim-wiggle, .anim-float, .anim-blink, .anim-rays, .anim-breathe, .anim-pulse-dot, .skeleton { animation: none !important; }
 }
 
 @media print {

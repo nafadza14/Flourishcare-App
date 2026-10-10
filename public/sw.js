@@ -3,8 +3,8 @@
  * - Hashed build assets and icons: cache first
  * - API requests: always network (never cached), so data stays fresh
  */
-const VERSION = 'flourishcare-v2';
-const SHELL = ['/', '/manifest.json', '/logo.svg', '/icons/icon-192.png', '/icons/icon-512.png'];
+const VERSION = 'flourishcare-v3';
+const SHELL = ['/', '/manifest.json', '/brand/logo-mark.png', '/brand/logo.png', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -44,7 +44,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (url.pathname.startsWith('/assets/') || url.pathname.startsWith('/icons/') || url.pathname.endsWith('.woff2')) {
+  if (url.pathname.startsWith('/assets/') || url.pathname.startsWith('/icons/') || url.pathname.startsWith('/brand/') || url.pathname.endsWith('.woff2')) {
     event.respondWith(
       caches.match(request).then(
         (cached) =>
