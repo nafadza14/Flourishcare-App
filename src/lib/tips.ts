@@ -1,3 +1,5 @@
+import { TEAM_SIGNATURE } from '../data/team';
+
 export interface ExpertTip {
   text: string;
   author: string;
@@ -8,28 +10,28 @@ export interface ExpertTip {
 export const DAILY_TIPS: ExpertTip[] = [
   {
     text: 'Puji usaha si Kecil secara spesifik, misalnya "Hebat, kamu berhasil menumpuk tiga balok!". Pujian yang jelas melatih rasa percaya diri dan kemandirian.',
-    author: 'Ira Amanda, M.Psi., Psikolog',
-    role: 'Psikolog anak',
+    author: TEAM_SIGNATURE,
+    role: 'Psikolog dan terapis anak',
   },
   {
     text: 'Matikan layar saat bermain bersama. Interaksi tatap muka 15 menit setiap hari jauh lebih bermakna untuk perkembangan bahasa daripada video edukasi.',
-    author: 'Dina Lestari, A.Md.TW',
-    role: 'Terapis wicara',
+    author: TEAM_SIGNATURE,
+    role: 'Psikolog dan terapis anak',
   },
   {
     text: 'Biarkan si Kecil bermain dengan tekstur berbeda seperti pasir, air, dan adonan. Pengalaman sensori yang beragam membantu otaknya mengolah rangsangan.',
-    author: 'Rian Hidayat, A.Md.OT',
-    role: 'Terapis okupasi',
+    author: TEAM_SIGNATURE,
+    role: 'Psikolog dan terapis anak',
   },
   {
     text: 'Saat anak tantrum, sejajarkan tinggi mata, tenangkan diri lebih dulu, lalu beri nama pada perasaannya. Anak belajar mengatur emosi dari ketenangan orang tuanya.',
-    author: 'Siti Sarah, M.Psi., Psikolog',
-    role: 'Psikolog tumbuh kembang',
+    author: TEAM_SIGNATURE,
+    role: 'Psikolog dan terapis anak',
   },
   {
     text: 'Bacakan buku bergambar sebelum tidur dan tunjuk gambarnya sambil menyebut nama benda. Kebiasaan kecil ini memperkaya kosakata si Kecil.',
-    author: 'Dina Lestari, A.Md.TW',
-    role: 'Terapis wicara',
+    author: TEAM_SIGNATURE,
+    role: 'Psikolog dan terapis anak',
   },
 ];
 

@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { openExternalBooking, USE_EXTERNAL_BOOKING } from './booking';
 import type { ScreeningType } from '../types';
 import type { ServiceCategory } from '../data/pricing';
 
@@ -94,6 +95,11 @@ export function NavProvider({ isAuthed, children }: NavProviderProps) {
 
   const push = useCallback(
     (route: Route) => {
+      // Booking happens on book.flourishcare.id for now (in-app flow kept for later)
+      if (route.name === 'booking' && USE_EXTERNAL_BOOKING) {
+        openExternalBooking();
+        return;
+      }
       if (!isAuthed && !PUBLIC_ROUTES.includes(route.name)) {
         pushRaw({ name: 'auth', redirect: route });
         return;

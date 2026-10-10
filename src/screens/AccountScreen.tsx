@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { openExternalBooking, USE_EXTERNAL_BOOKING } from '../lib/booking';
 import { motion } from 'motion/react';
-import { Bell, BellRing, CalendarCheck, Check, Info, LogOut, Mail, MapPin, MessageCircle, MessageCircleHeart, Pencil, Phone, Plus, Smartphone, Syringe, Footprints, User } from 'lucide-react';
+import { ArrowUpRight, Bell, BellRing, CalendarCheck, Check, Info, LogOut, Mail, MapPin, MessageCircle, MessageCircleHeart, Pencil, Phone, Plus, Smartphone, Syringe, Footprints, User } from 'lucide-react';
 import Screen from '../components/ui/Screen';
 import Sheet from '../components/ui/Sheet';
 import Switch from '../components/ui/Switch';
@@ -154,7 +155,17 @@ export default function AccountScreen() {
       </ListGroup>
 
       <ListGroup title="Aktivitas" className="mt-7">
-        <ListRow icon={CalendarCheck} title="Jadwal klinik" subtitle="Booking terapi dan konsultasi" onClick={() => nav.push({ name: 'bookings' })} />
+        {USE_EXTERNAL_BOOKING ? (
+          <ListRow
+            icon={CalendarCheck}
+            title="Booking klinik"
+            subtitle="Terapi dan konsultasi di book.flourishcare.id"
+            trailing={<ArrowUpRight className="w-[18px] h-[18px] text-faint shrink-0" strokeWidth={2} />}
+            onClick={openExternalBooking}
+          />
+        ) : (
+          <ListRow icon={CalendarCheck} title="Jadwal klinik" subtitle="Booking terapi dan konsultasi" onClick={() => nav.push({ name: 'bookings' })} />
+        )}
         <ListRow icon={Bell} title="Notifikasi" value={unreadCount ? `${unreadCount} baru` : undefined} onClick={() => nav.push({ name: 'notifications' })} />
         <ListRow icon={MessageCircleHeart} title="Tanya ahli" onClick={() => nav.push({ name: 'qa' })} />
       </ListGroup>
@@ -189,7 +200,7 @@ export default function AccountScreen() {
       </motion.p>
 
       <EditProfileSheet open={editOpen} onClose={() => setEditOpen(false)} profile={profile} />
-      <AboutSheet open={aboutOpen} onClose={() => setAboutOpen(false)} />
+      <AboutSheet open={aboutOpen} onClose={() => setAboutOpen(false)} showAdmin={!!profile?.isStaff} />
       <Sheet open={logoutOpen} onClose={() => setLogoutOpen(false)} title="Keluar dari akun?" subtitle="Data Anda tetap tersimpan dan bisa diakses lagi saat masuk.">
         <div className="grid grid-cols-2 gap-2.5 pt-2">
           <Button variant="secondary" onClick={() => setLogoutOpen(false)}>

@@ -6,6 +6,10 @@ export interface UserProfile {
   city: string;
   role: 'parent' | 'caregiver';
   createdAt: string;
+  /** Clinic staff (psychologist or therapist) can answer Tanya Ahli questions */
+  isStaff?: boolean;
+  /** Photo from Google sign-in, when available */
+  avatarUrl?: string;
 }
 
 export interface Child {

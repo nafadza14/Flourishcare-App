@@ -5,13 +5,12 @@ import Screen from '../components/ui/Screen';
 import ProgressRing from '../components/ui/ProgressRing';
 import Confetti from '../components/ui/Confetti';
 import { Card } from '../components/ui/primitives';
-import { PhotoAvatar } from '../components/ui/Avatar';
+import { TeamAvatar } from '../components/ui/Avatar';
 import { useToast } from '../components/ui/Toast';
 import { useStore } from '../lib/store';
 import { ageInMonths } from '../lib/format';
 import { activitiesForAge, getCompleted, getStreak, setCompleted } from '../lib/stimulasi';
 import { tipOfTheDay } from '../lib/tips';
-import { CLINICAL_EXPERTS } from '../data/seedData';
 import { emitDataChanged } from '../lib/events';
 import { haptic } from '../lib/haptics';
 import { listContainer, listItem } from '../lib/motion';
@@ -36,7 +35,6 @@ export default function StimulasiScreen({ onBack }: { onBack?: () => void }) {
   const activities = activitiesForAge(age);
   const doneCount = activities.filter((a) => done.includes(a.id)).length;
   const tip = tipOfTheDay();
-  const expert = CLINICAL_EXPERTS.find((e) => tip.author.startsWith(e.name.split(',')[0]));
 
   const toggle = (id: string) => {
     const isDone = done.includes(id);
@@ -160,7 +158,7 @@ export default function StimulasiScreen({ onBack }: { onBack?: () => void }) {
         <div className="text-[14px] text-brand-orange-deep">Pesan dari ahli</div>
         <p className="text-[16px] leading-relaxed text-ink mt-2">{tip.text}</p>
         <div className="flex items-center gap-2.5 mt-4">
-          <PhotoAvatar src={expert?.photoUrl} name={tip.author} size={34} />
+          <TeamAvatar size={34} />
           <div>
             <div className="text-[15px]">{tip.author}</div>
             <div className="text-[13px] text-mute">{tip.role} FlourishCare</div>

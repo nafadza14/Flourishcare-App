@@ -8,14 +8,15 @@ import Switch from '../components/ui/Switch';
 import { TextArea } from '../components/ui/Field';
 import { Button, Card, Chip, EmptyState, IconButton, Skeleton } from '../components/ui/primitives';
 import { ListGroup, ListRow } from '../components/ui/ListGroup';
-import { PhotoAvatar } from '../components/ui/Avatar';
+import { PhotoAvatar, TeamAvatar } from '../components/ui/Avatar';
 import { useToast } from '../components/ui/Toast';
 import type { Question } from '../types';
 import { useStore } from '../lib/store';
 import { getJSON, sendJSON } from '../api';
 import { emitDataChanged } from '../lib/events';
 import { stripEmDash, timeAgo } from '../lib/format';
-import { CLINICAL_EXPERTS } from '../data/seedData';
+import { findExpertByName } from '../data/team';
+import { useExperts } from '../lib/experts';
 import { listContainer, listItem } from '../lib/motion';
 
 const CATEGORIES = [
@@ -32,9 +33,11 @@ function categoryLabel(key?: string) {
   return CATEGORIES.find((c) => c.key === key)?.label ?? 'Umum';
 }
 
-function expertFor(name?: string) {
-  if (!name) return undefined;
-  return CLINICAL_EXPERTS.find((e) => name.startsWith(e.name.split(',')[0]));
+/** Photo of the team member who answered, or the clinic mark for team or AI answers. */
+function AnswerAvatar({ name }: { name?: string }) {
+  const experts = useExperts();
+  const expert = findExpertByName(experts, name);
+  return expert ? <PhotoAvatar src={expert.photoUrl} name={expert.name} size={32} /> : <TeamAvatar size={32} />;
 }
 
 function TypingBubble() {
@@ -54,14 +57,13 @@ function TypingBubble() {
             />
           ))}
         </div>
-        <div className="text-[13px] text-mute mt-1.5">Ahli sedang meninjau pertanyaan</div>
+        <div className="text-[13px] text-mute mt-1.5">Menunggu jawaban psikolog atau terapis FlourishCare</div>
       </div>
     </div>
   );
 }
 
 function Thread({ q }: { q: Question }) {
-  const expert = expertFor(q.answeredBy);
   return (
     <motion.div variants={listItem} className="space-y-2.5">
       <div className="flex justify-end">
@@ -75,7 +77,7 @@ function Thread({ q }: { q: Question }) {
         <TypingBubble />
       ) : (
         <div className="flex items-end gap-2">
-          <PhotoAvatar src={expert?.photoUrl} name={q.answeredBy ?? 'Ahli'} size={32} />
+          <AnswerAvatar name={q.answeredBy} />
           <div className="max-w-[86%] bg-white border border-line rounded-[20px] rounded-bl-[6px] px-4 py-3 shadow-card">
             <div className="text-[13px] text-mute flex items-center gap-1">
               <ShieldCheck className="w-3.5 h-3.5 text-semantic-success" />
@@ -233,7 +235,7 @@ function ExpertAnswerSheet({ question, onClose }: { question: Question | null; o
     if (!question || text.trim().length < 10) return;
     setSending(true);
     try {
-      await sendJSON(`/api/questions/${question.id}/answer`, { expertId: 'exp_ira', answerText: stripEmDash(text.trim()) });
+      await sendJSON(`/api/questions/${question.id}/answer`, { answerText: stripEmDash(text.trim()) });
       emitDataChanged('questions');
       toast({ title: 'Jawaban terkirim' });
       onClose();
@@ -279,7 +281,9 @@ export default function TanyaAhliScreen({ onBack }: { onBack?: () => void }) {
   const [tab, setTab] = useState<'mine' | 'faq'>('mine');
   const [composeOpen, setComposeOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [expertMode, setExpertMode] = useState(false);
+  // Staff without a child profile land straight in the answer queue
+  const [expertMode, setExpertMode] = useState(() => !!profile?.isStaff && !activeChild);
+  const experts = useExperts();
   const [answering, setAnswering] = useState<Question | null>(null);
   const pendingIds = useRef<Set<string>>(new Set());
 
@@ -320,12 +324,12 @@ export default function TanyaAhliScreen({ onBack }: { onBack?: () => void }) {
   // Poll while waiting for an answer
   useEffect(() => {
     if (!hasPending) return;
-    const id = window.setInterval(load, 3000);
+    const id = window.setInterval(load, 20000);
     return () => window.clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasPending]);
 
-  if (!activeChild) return null;
+  if (!activeChild && !profile?.isStaff) return null;
 
   const monthStart = new Date();
   monthStart.setDate(1);
@@ -338,9 +342,9 @@ export default function TanyaAhliScreen({ onBack }: { onBack?: () => void }) {
       title="Tanya Ahli"
       subtitle="Dijawab psikolog dan terapis FlourishCare"
       onBack={onBack}
-      right={<IconButton icon={EllipsisVertical} label="Lainnya" onClick={() => setMenuOpen(true)} />}
+      right={profile?.isStaff ? <IconButton icon={EllipsisVertical} label="Lainnya" onClick={() => setMenuOpen(true)} /> : undefined}
       titleAccessory={
-        !expertMode && (
+        !expertMode && activeChild && (
           <Button size="sm" icon={Plus} onClick={() => setComposeOpen(true)}>
             Tanya
           </Button>
@@ -352,8 +356,8 @@ export default function TanyaAhliScreen({ onBack }: { onBack?: () => void }) {
           <Card className="p-4 flex items-center gap-3 bg-ink border-0 text-white">
             <ShieldCheck className="w-6 h-6 text-brand-yellow" />
             <div className="flex-1">
-              <div className="text-[16px]">Mode ahli (demo)</div>
-              <div className="text-[14px] text-white/70">{queue.length} pertanyaan menunggu jawaban</div>
+              <div className="text-[16px]">Mode ahli</div>
+              <div className="text-[14px] text-white/70">{queue.length} pertanyaan menunggu jawaban. Jawaban tampil atas nama Anda.</div>
             </div>
           </Card>
           {queue.length === 0 ? (
@@ -376,7 +380,7 @@ export default function TanyaAhliScreen({ onBack }: { onBack?: () => void }) {
             <Card className="p-4">
               <div className="flex items-center gap-3">
                 <div className="flex -space-x-2.5">
-                  {CLINICAL_EXPERTS.map((e) => (
+                  {experts.map((e) => (
                     <PhotoAvatar key={e.id} src={e.photoUrl} name={e.name} size={36} className="ring-2 ring-white" />
                   ))}
                 </div>
@@ -453,7 +457,9 @@ export default function TanyaAhliScreen({ onBack }: { onBack?: () => void }) {
         </>
       )}
 
-      <ComposeSheet open={composeOpen} onClose={() => setComposeOpen(false)} remaining={remaining} childId={activeChild.id} childName={activeChild.name} />
+      {activeChild && (
+        <ComposeSheet open={composeOpen} onClose={() => setComposeOpen(false)} remaining={remaining} childId={activeChild.id} childName={activeChild.name} />
+      )}
       <ExpertAnswerSheet question={answering} onClose={() => setAnswering(null)} />
 
       <Sheet open={menuOpen} onClose={() => setMenuOpen(false)} title="Lainnya">
@@ -461,8 +467,8 @@ export default function TanyaAhliScreen({ onBack }: { onBack?: () => void }) {
           <ListRow
             icon={ShieldCheck}
             iconTone="brown"
-            title="Mode ahli (demo)"
-            subtitle="Menjawab antrean sebagai tim klinik"
+            title="Mode ahli"
+            subtitle="Jawab pertanyaan orang tua sebagai tim FlourishCare"
             trailing={<Switch checked={expertMode} onChange={(v) => { setExpertMode(v); setMenuOpen(false); }} label="Mode ahli" />}
           />
         </ListGroup>

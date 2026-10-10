@@ -6,6 +6,9 @@ export function haptic(kind: 'light' | 'medium' | 'success' | 'warning' = 'light
   try {
     if (typeof navigator === 'undefined' || !('vibrate' in navigator)) return;
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    // Browsers only allow vibration after the first tap
+    const activation = (navigator as Navigator & { userActivation?: { hasBeenActive: boolean } }).userActivation;
+    if (activation && !activation.hasBeenActive) return;
     const pattern: Record<string, number | number[]> = {
       light: 6,
       medium: 12,

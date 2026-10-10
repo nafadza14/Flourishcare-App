@@ -23,6 +23,8 @@ import BookingsScreen from './screens/BookingsScreen';
 import NotificationsScreen from './screens/NotificationsScreen';
 import AuthScreen from './screens/AuthScreen';
 import OnboardingScreen from './screens/OnboardingScreen';
+import NewPasswordSheet from './components/sheets/NewPasswordSheet';
+import { takeAuthIntent } from './lib/supabase';
 
 const TAB_KEYS: TabKey[] = ['home', 'child', 'vaccine', 'account'];
 
@@ -137,9 +139,17 @@ function TabView({ tab }: { tab: TabKey }) {
 }
 
 function Shell() {
-  const { booting, isAuthed, children, activeChild } = useStore();
+  const { booting, isAuthed, children, activeChild, recoveryMode, setRecoveryMode, profile } = useStore();
   const nav = useNav();
   const [visited, setVisited] = useState<Set<TabKey>>(() => new Set(['home']));
+
+  // Back from Google: continue to the screen the parent wanted before signing in
+  useEffect(() => {
+    if (booting || !isAuthed) return;
+    const intent = takeAuthIntent<{ redirect?: Route; redirectTab?: TabKey }>();
+    if (intent && (intent.redirect || intent.redirectTab)) nav.completeAuth(intent);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [booting, isAuthed]);
 
   useEffect(() => {
     setVisited((v) => (v.has(nav.tab) ? v : new Set(v).add(nav.tab)));
@@ -149,7 +159,8 @@ function Shell() {
     if (!isAuthed) setVisited(new Set(['home']));
   }, [isAuthed]);
 
-  const needsOnboarding = !booting && isAuthed && children.length === 0;
+  // Clinic staff can use the app without adding a child
+  const needsOnboarding = !booting && isAuthed && children.length === 0 && !profile?.isStaff;
   const pushed = nav.stack.length > 0;
   const childScoped = isAuthed && !!activeChild;
 
@@ -208,6 +219,8 @@ function Shell() {
       </AnimatePresence>
 
       <AnimatePresence>{booting && <Splash />}</AnimatePresence>
+
+      <NewPasswordSheet open={recoveryMode && isAuthed} onClose={() => setRecoveryMode(false)} />
     </div>
   );
 }
@@ -225,11 +238,11 @@ export default function App() {
   return (
     <MotionConfig reducedMotion="user">
       <PhoneShell>
-        <StoreProvider>
-          <ToastProvider>
+        <ToastProvider>
+          <StoreProvider>
             <Root />
-          </ToastProvider>
-        </StoreProvider>
+          </StoreProvider>
+        </ToastProvider>
       </PhoneShell>
     </MotionConfig>
   );

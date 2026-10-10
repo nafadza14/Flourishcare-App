@@ -128,7 +128,7 @@ export function RecordSheet({ record, child, onClose }: { record: GrowthRecord |
     if (!record) return;
     setDeleting(true);
     try {
-      const res = await apiFetch(`/api/growth/${record.id}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/growth/${record.id}?childId=${encodeURIComponent(record.childId)}`, { method: 'DELETE' });
       if (!res.ok) throw new Error();
       emitDataChanged('growth');
       toast({ title: 'Pengukuran dihapus', tone: 'info' });

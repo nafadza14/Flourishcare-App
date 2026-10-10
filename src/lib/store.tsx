@@ -1,11 +1,13 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { Child, Notification, UserProfile } from '../types';
-import { apiFetch, getJSON } from '../api';
+import { apiFetch, clearLegacyToken, getJSON, hasLegacyToken } from '../api';
 import { useDataChanged } from './events';
+import { consumeAuthRedirect, hasStoredSession, signOutSupabase } from './supabase';
+import { useToast } from '../components/ui/Toast';
+import { firstName } from './format';
 
 interface AppStore {
   booting: boolean;
-  token: string | null;
   profile: UserProfile | null;
   isAuthed: boolean;
   children: Child[];
@@ -14,8 +16,12 @@ interface AppStore {
   refreshChildren: (selectId?: string) => Promise<Child[]>;
   refreshProfile: () => Promise<void>;
   setProfile: (p: UserProfile) => void;
-  login: (user: UserProfile, token: string) => void;
-  logout: () => void;
+  /** Load the app profile for the current Supabase session (after any sign-in). */
+  establishSession: () => Promise<UserProfile | null>;
+  logout: () => Promise<void>;
+  /** True after opening a password reset link: the app asks for a new password. */
+  recoveryMode: boolean;
+  setRecoveryMode: (v: boolean) => void;
   unreadCount: number;
   refreshNotifications: () => Promise<Notification[]>;
   parentVariant: 'bunda' | 'ayah' | 'wali';
@@ -27,6 +33,13 @@ export function useStore(): AppStore {
   const ctx = useContext(StoreContext);
   if (!ctx) throw new Error('useStore must be used inside StoreProvider');
   return ctx;
+}
+
+/** The auth redirect (?code=...) must be consumed exactly once, even when effects run twice in development. */
+let bootRedirect: ReturnType<typeof consumeAuthRedirect> | null = null;
+function consumeRedirectOnce() {
+  if (!bootRedirect) bootRedirect = consumeAuthRedirect();
+  return bootRedirect;
 }
 
 const LOCAL_CHILDREN_KEY = 'fc_local_children';
@@ -44,15 +57,18 @@ function readLocalChildren(): Child[] {
 }
 
 export function StoreProvider({ children: content }: { children: React.ReactNode }) {
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem('auth_token'));
+  const toast = useToast();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [childList, setChildList] = useState<Child[]>([]);
   const [activeId, setActiveId] = useState<string | null>(() => localStorage.getItem(ACTIVE_CHILD_KEY));
   const [booting, setBooting] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [recoveryMode, setRecoveryMode] = useState(false);
   const [parentVariant, setParentVariant] = useState<'bunda' | 'ayah' | 'wali'>(
     () => (localStorage.getItem(SUBROLE_KEY) as 'bunda' | 'ayah' | 'wali') || 'bunda',
   );
+  const profileRef = useRef<UserProfile | null>(null);
+  profileRef.current = profile;
 
   const refreshChildren = useCallback(async (selectId?: string) => {
     const remote = await getJSON<Child[]>('/api/children', []);
@@ -86,25 +102,91 @@ export function StoreProvider({ children: content }: { children: React.ReactNode
     return list;
   }, []);
 
+  const resetState = useCallback(() => {
+    localStorage.removeItem(ACTIVE_CHILD_KEY);
+    setProfile(null);
+    setChildList([]);
+    setActiveId(null);
+    setUnreadCount(0);
+  }, []);
+
+  const logout = useCallback(async () => {
+    clearLegacyToken();
+    resetState();
+    await signOutSupabase();
+  }, [resetState]);
+
+  const establishSession = useCallback(async (): Promise<UserProfile | null> => {
+    const supabaseSession = hasStoredSession();
+    if (!supabaseSession && !hasLegacyToken()) {
+      setProfile(null);
+      return null;
+    }
+    try {
+      const res = supabaseSession ? await apiFetch('/api/auth/session', { method: 'POST' }) : await apiFetch('/api/profile');
+      if (res.status === 401) {
+        await logout();
+        return null;
+      }
+      if (!res.ok) throw new Error(`status ${res.status}`);
+      const data = await res.json();
+      const user = (supabaseSession ? data.user : data) as UserProfile;
+      const sub = localStorage.getItem(SUBROLE_KEY) as 'bunda' | 'ayah' | 'wali' | null;
+      if (sub) setParentVariant(sub);
+      await refreshChildren();
+      setProfile(user);
+      refreshNotifications();
+      return user;
+    } catch {
+      toast({ title: 'Tidak dapat terhubung', body: 'Server FlourishCare belum merespons. Coba buka ulang aplikasi sebentar lagi.', tone: 'warning' });
+      return null;
+    }
+  }, [logout, refreshChildren, refreshNotifications, toast]);
+
+  // Boot: finish a Google sign-in, email confirmation, or password reset, then load the session
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!token) {
-        setBooting(false);
-        return;
+      const ret = await consumeRedirectOnce();
+      if (cancelled) return;
+      if (ret.kind === 'error') {
+        toast(
+          ret.flow === 'confirm'
+            ? { title: 'Email terverifikasi', body: ret.message }
+            : { title: 'Belum berhasil masuk', body: ret.message, tone: 'warning' },
+        );
       }
-      setBooting(true);
-      await Promise.all([refreshProfile(), refreshChildren(), refreshNotifications()]);
-      if (!cancelled) setBooting(false);
+      const user = await establishSession();
+      if (cancelled) return;
+      if (ret.kind === 'session' && user) {
+        if (ret.flow === 'recovery') {
+          setRecoveryMode(true);
+        } else {
+          toast({ title: `Halo, ${firstName(user.fullName)}`, body: ret.flow === 'confirm' ? 'Email terverifikasi. Akun Anda sudah aktif.' : 'Berhasil masuk dengan Google.' });
+        }
+      }
+      setBooting(false);
     })();
     return () => {
       cancelled = true;
     };
-  }, [token, refreshProfile, refreshChildren, refreshNotifications]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // The server rejected the session (expired or revoked)
+  useEffect(() => {
+    const onUnauthorized = () => {
+      if (!profileRef.current) return;
+      logout();
+      toast({ title: 'Sesi berakhir', body: 'Silakan masuk lagi untuk melanjutkan.', tone: 'info' });
+    };
+    window.addEventListener('fc:unauthorized', onUnauthorized);
+    return () => window.removeEventListener('fc:unauthorized', onUnauthorized);
+  }, [logout, toast]);
 
   useDataChanged(
     (scope) => {
-      if (!token) return;
+      if (!profileRef.current) return;
       if (scope === 'children') refreshChildren();
       if (scope === 'profile') refreshProfile();
       if (scope === 'notifications' || scope === 'bookings' || scope === 'questions' || scope === 'screenings') {
@@ -112,27 +194,8 @@ export function StoreProvider({ children: content }: { children: React.ReactNode
         window.setTimeout(() => refreshNotifications(), 300);
       }
     },
-    [token, refreshChildren, refreshProfile, refreshNotifications],
+    [refreshChildren, refreshProfile, refreshNotifications],
   );
-
-  const login = useCallback((user: UserProfile, newToken: string) => {
-    localStorage.setItem('auth_token', newToken);
-    const sub = localStorage.getItem(SUBROLE_KEY) as 'bunda' | 'ayah' | 'wali' | null;
-    if (sub) setParentVariant(sub);
-    setProfile(user);
-    setToken(newToken);
-  }, []);
-
-  const logout = useCallback(() => {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem(ACTIVE_CHILD_KEY);
-    setToken(null);
-    setProfile(null);
-    setChildList([]);
-    setActiveId(null);
-    setUnreadCount(0);
-    fetch('/api/auth/logout', { method: 'POST' }).catch(() => undefined);
-  }, []);
 
   const setActiveChild = useCallback((id: string) => {
     localStorage.setItem(ACTIVE_CHILD_KEY, id);
@@ -143,17 +206,18 @@ export function StoreProvider({ children: content }: { children: React.ReactNode
 
   const value: AppStore = {
     booting,
-    token,
     profile,
-    isAuthed: !!token && !!profile,
+    isAuthed: !!profile,
     children: childList,
     activeChild,
     setActiveChild,
     refreshChildren,
     refreshProfile,
     setProfile,
-    login,
+    establishSession,
     logout,
+    recoveryMode,
+    setRecoveryMode,
     unreadCount,
     refreshNotifications,
     parentVariant,

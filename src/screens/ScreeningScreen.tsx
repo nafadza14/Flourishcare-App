@@ -29,9 +29,9 @@ const ICONS: Record<ScreeningType, typeof Brain> = {
 const TONE_COLOR = { success: '#4F9A68', warning: '#E3A12B', danger: '#D9634A' } as const;
 
 function bookingTarget(type: ScreeningType) {
-  if (type === 'mchat_r') return { category: 'psikotes' as const, subCode: 'DIAG', therapistId: 'exp_siti', label: 'Jadwalkan asesmen psikolog' };
-  if (type === 'speech_delay') return { category: 'onsite' as const, subCode: 'TW', therapistId: 'exp_dina', label: 'Jadwalkan terapi wicara' };
-  return { category: 'psikolog' as const, subCode: 'KONSUL', therapistId: 'exp_ira', label: 'Konsultasi dengan psikolog' };
+  if (type === 'mchat_r') return { category: 'psikotes' as const, subCode: 'DIAG', label: 'Jadwalkan asesmen psikolog' };
+  if (type === 'speech_delay') return { category: 'onsite' as const, subCode: 'TW', label: 'Jadwalkan terapi wicara' };
+  return { category: 'psikolog' as const, subCode: 'KONSUL', label: 'Konsultasi dengan psikolog' };
 }
 
 /** Screening history list, reused in the child profile */
@@ -139,7 +139,7 @@ function Report({ child, report, onDone, celebrate }: { child: Child; report: Sc
             variant="secondary"
             icon={CalendarCheck}
             className="mt-4 !text-brand-orange-deep !border-white"
-            onClick={() => nav.push({ name: 'booking', category: target.category, subCode: target.subCode, therapistId: target.therapistId })}
+            onClick={() => nav.push({ name: 'booking', category: target.category, subCode: target.subCode })}
           >
             {target.label}
           </Button>

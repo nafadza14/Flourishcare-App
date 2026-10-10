@@ -1,5 +1,6 @@
 import React, { useId, useState } from 'react';
 import { cx } from '../../lib/cx';
+import FlourishCareLogo from '../FlourishCareLogo';
 
 /**
  * Original illustrated avatars with soft 3D shading, drawn in SVG.
@@ -173,7 +174,7 @@ export function ParentAvatar({ variant = 'bunda', size = 44, className }: Parent
 }
 
 /** Photo avatar with graceful initials fallback (for experts) */
-export function PhotoAvatar({ src, name, size = 48, className }: { src?: string; name: string; size?: number; className?: string }) {
+export function PhotoAvatar({ src, name, size = 48, className, rounded }: { src?: string; name: string; size?: number; className?: string; rounded?: boolean }) {
   const [failed, setFailed] = useState(false);
   const initials = name
     .replace(/,.*$/, '')
@@ -185,13 +186,26 @@ export function PhotoAvatar({ src, name, size = 48, className }: { src?: string;
   return (
     <span
       style={{ width: size, height: size }}
-      className={cx('shrink-0 rounded-full overflow-hidden bg-brand-orange-soft text-brand-orange-deep flex items-center justify-center', className)}
+      className={cx('shrink-0 overflow-hidden bg-brand-orange-soft text-brand-orange-deep flex items-center justify-center', rounded ? 'rounded-[18px]' : 'rounded-full', className)}
     >
       {src && !failed ? (
-        <img src={src} alt={name} referrerPolicy="no-referrer" onError={() => setFailed(true)} className="w-full h-full object-cover" />
+        <img src={src} alt={name} referrerPolicy="no-referrer" onError={() => setFailed(true)} className="w-full h-full object-cover object-[50%_22%]" loading="lazy" />
       ) : (
         <span style={{ fontSize: size * 0.36 }} className="font-medium">{initials}</span>
       )}
+    </span>
+  );
+}
+
+/** Avatar for content signed by the clinic team as a whole */
+export function TeamAvatar({ size = 34, className }: { size?: number; className?: string }) {
+  return (
+    <span
+      style={{ width: size, height: size }}
+      className={cx('shrink-0 rounded-full bg-white border border-line flex items-center justify-center', className)}
+      aria-hidden
+    >
+      <FlourishCareLogo className="w-[72%] h-[72%]" />
     </span>
   );
 }

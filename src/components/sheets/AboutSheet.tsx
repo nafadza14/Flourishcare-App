@@ -9,21 +9,27 @@ import { getJSON } from '../../api';
 
 interface DbStatus {
   connected: boolean;
+  tablesReady?: boolean;
+  secretKey?: boolean;
   error?: string;
+  hint?: string;
 }
 
-export const APP_VERSION = '1.3.0';
+export const APP_VERSION = '1.4.0';
 
-export default function AboutSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+/** About the app. The database panel is only shown to clinic staff (setup help). */
+export default function AboutSheet({ open, onClose, showAdmin = false }: { open: boolean; onClose: () => void; showAdmin?: boolean }) {
   const [status, setStatus] = useState<DbStatus | null>(null);
   const [showSql, setShowSql] = useState(false);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !showAdmin) return;
     setStatus(null);
     getJSON<DbStatus>('/api/supabase-status', { connected: false, error: 'Server tidak merespons' }).then(setStatus);
-  }, [open]);
+  }, [open, showAdmin]);
+
+  const ready = !!status?.tablesReady && !!status?.secretKey;
 
   const copy = async () => {
     try {
@@ -49,26 +55,29 @@ export default function AboutSheet({ open, onClose }: { open: boolean; onClose: 
           FlourishCare membantu orang tua memantau pertumbuhan, milestone, imunisasi, dan skrining dini si Kecil. Bila butuh bantuan lebih, psikolog dan terapis klinik FlourishCare siap mendampingi, baik di klinik maupun di rumah.
         </p>
 
+        {showAdmin && (
         <div className="bg-white rounded-[20px] border border-line p-4">
           <div className="flex items-center justify-between gap-2">
             <span className="flex items-center gap-2 text-[16px]">
               <Database className="w-[18px] h-[18px] text-ink-2" strokeWidth={1.7} />
-              Database
+              Database (khusus tim)
             </span>
             {status === null ? (
               <StatusPill>Memeriksa</StatusPill>
-            ) : status.connected ? (
-              <StatusPill tone="success">Terhubung</StatusPill>
+            ) : ready ? (
+              <StatusPill tone="success">Tersimpan permanen</StatusPill>
             ) : (
-              <StatusPill tone="warning">Mode lokal</StatusPill>
+              <StatusPill tone="warning">Perlu pengaturan</StatusPill>
             )}
           </div>
           <p className="text-[14px] text-mute leading-relaxed mt-2">
-            {status?.connected
-              ? 'Data tersimpan di Supabase secara real-time.'
-              : 'Data saat ini tersimpan di memori server. Jalankan skema SQL di Supabase SQL Editor untuk menyimpan data secara permanen.'}
+            {status === null
+              ? 'Memeriksa koneksi Supabase...'
+              : ready
+                ? 'Data aplikasi tersimpan di Supabase dan dilindungi Row Level Security.'
+                : status.hint || 'Data belum tersimpan permanen. Jalankan skema SQL di Supabase SQL Editor dan isi SUPABASE_SECRET_KEY di Vercel.'}
           </p>
-          {status && !status.connected && (
+          {status && !ready && (
             <div className="flex gap-2 mt-3">
               <Button size="sm" variant="soft" icon={copied ? Check : Copy} onClick={copy}>
                 {copied ? 'Tersalin' : 'Salin skema SQL'}
@@ -84,13 +93,14 @@ export default function AboutSheet({ open, onClose }: { open: boolean; onClose: 
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: 220, opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
-                className="mt-3 overflow-auto rounded-[14px] bg-ink text-white/85 text-[11px] leading-relaxed p-3 font-mono select-all whitespace-pre"
+                className="mt-3 overflow-auto rounded-[14px] bg-ink text-white/85 text-[11px] leading-relaxed p-3 font-mono selectable whitespace-pre"
               >
                 {SCHEMA_SQL}
               </motion.pre>
             )}
           </AnimatePresence>
         </div>
+        )}
         <p className="text-[13px] text-mute text-center leading-relaxed">Mitra resmi layanan tumbuh kembang klinik FlourishCare. Konten bersifat edukatif dan bukan pengganti pemeriksaan langsung.</p>
       </div>
     </Sheet>

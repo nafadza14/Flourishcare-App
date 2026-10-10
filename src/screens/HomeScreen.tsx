@@ -21,7 +21,10 @@ import {
 } from 'lucide-react';
 import Screen from '../components/ui/Screen';
 import { ArrowCorner, Button, Card, IconButton, Skeleton, StatItem } from '../components/ui/primitives';
-import { KidAvatar, ParentAvatar, PhotoAvatar } from '../components/ui/Avatar';
+import { KidAvatar, ParentAvatar, PhotoAvatar, TeamAvatar } from '../components/ui/Avatar';
+import ExpertSheet from '../components/sheets/ExpertSheet';
+import { useExperts } from '../lib/experts';
+import type { ClinicalExpert } from '../data/team';
 import ChildSwitcherSheet from '../components/sheets/ChildSwitcherSheet';
 import FlourishCareLogo from '../components/FlourishCareLogo';
 import { useStore } from '../lib/store';
@@ -34,7 +37,7 @@ import { buildVaccineSchedule, nextVaccine, vaccineTiming } from '../lib/vaccine
 import { resultLabel } from '../lib/screening';
 import { activitiesForAge, getCompleted } from '../lib/stimulasi';
 import { tipOfTheDay } from '../lib/tips';
-import { ARTICLES_SEED, CLINICAL_EXPERTS } from '../data/seedData';
+import { ARTICLES_SEED } from '../data/seedData';
 import { listContainer, listItem } from '../lib/motion';
 import { cx } from '../lib/cx';
 import { haptic } from '../lib/haptics';
@@ -92,9 +95,43 @@ const GUEST_FEATURES: Feature[] = [
   { key: 'booking', title: 'Booking Klinik', status: 'Terapi dan konsultasi', icon: CalendarCheck, route: { name: 'booking' } },
 ];
 
+/** Real FlourishCare team (www.flourishcare.id/team), tap for profile. */
+function TeamSection() {
+  const experts = useExperts();
+  const [open, setOpen] = useState<ClinicalExpert | null>(null);
+  if (!experts.length) return null;
+  return (
+    <div className="mt-7">
+      <div className="px-5 mb-3">
+        <h2 className="text-[22px] font-normal leading-tight">Tim ahli kami</h2>
+        <p className="text-[15px] text-mute mt-0.5">Psikolog dan terapis anak FlourishCare</p>
+      </div>
+      <motion.div className="flex gap-3 overflow-x-auto no-scrollbar px-5 pb-1" variants={listContainer} initial="hidden" animate="show">
+        {experts.map((e) => (
+          <motion.button
+            key={e.id}
+            variants={listItem}
+            whileTap={{ scale: 0.97 }}
+            onClick={() => {
+              haptic('light');
+              setOpen(e);
+            }}
+            className="w-[168px] shrink-0 text-left bg-white rounded-[24px] border border-line shadow-card p-3"
+          >
+            <PhotoAvatar src={e.photoUrl} name={e.name} size={64} rounded />
+            <div className="text-[16px] leading-snug mt-3 line-clamp-2 min-h-[42px]">{e.name.split(',')[0]}</div>
+            <div className="text-[13px] text-brand-orange-deep mt-0.5">{e.role}</div>
+            <div className="text-[12.5px] text-mute mt-1.5 line-clamp-2 leading-snug">{e.specialties.slice(0, 2).join(' · ')}</div>
+          </motion.button>
+        ))}
+      </motion.div>
+      <ExpertSheet expert={open} onClose={() => setOpen(null)} />
+    </div>
+  );
+}
+
 function TipCard() {
   const tip = tipOfTheDay();
-  const expert = CLINICAL_EXPERTS.find((e) => tip.author.startsWith(e.name.split(',')[0]));
   return (
     <Card className="mx-5 p-5 relative overflow-hidden">
       <span className="absolute -right-6 -bottom-8 w-28 h-28 rounded-full bg-brand-orange-soft" aria-hidden />
@@ -104,13 +141,45 @@ function TipCard() {
       </div>
       <p className="relative text-[17px] leading-relaxed text-ink mt-2.5">{tip.text}</p>
       <div className="relative flex items-center gap-2.5 mt-4">
-        <PhotoAvatar src={expert?.photoUrl} name={tip.author} size={34} />
+        <TeamAvatar size={34} />
         <div className="min-w-0">
           <div className="text-[15px] text-ink truncate">{tip.author}</div>
-          <div className="text-[13px] text-mute">{tip.role} FlourishCare</div>
+          <div className="text-[13px] text-mute">{tip.role}</div>
         </div>
       </div>
     </Card>
+  );
+}
+
+/** Clinic staff signed in without a child profile: shortcut to the question queue. */
+function StaffHome() {
+  const nav = useNav();
+  const { profile } = useStore();
+  return (
+    <Screen title="Beranda" hideNav largeTitle={false} withTabBar bottomSpacer={false}>
+      <div className="px-5 pt-3 flex items-center gap-2.5">
+        <FlourishCareLogo className="w-11 h-11" animated />
+        <div>
+          <div className="text-[19px] leading-tight">Hai, {firstName(profile?.fullName)}</div>
+          <div className="text-[13px] text-mute">Mode tim FlourishCare</div>
+        </div>
+      </div>
+      <div className="px-5 mt-6">
+        <div className="rounded-[26px] bg-orange-gradient text-white p-5 shadow-orange relative overflow-hidden">
+          <span className="absolute -right-10 -top-10 w-40 h-40 rounded-full bg-white/10" aria-hidden />
+          <div className="relative text-[14px] text-white/85">Tanya Ahli</div>
+          <div className="relative text-[24px] leading-tight mt-1">Jawab pertanyaan orang tua</div>
+          <p className="relative text-[15px] text-white/85 mt-1.5">Jawaban akan tampil atas nama Anda dan dikirim sebagai notifikasi.</p>
+          <Button variant="secondary" className="relative mt-4" icon={MessageCircleHeart} onClick={() => nav.push({ name: 'qa' })}>
+            Buka antrean
+          </Button>
+        </div>
+      </div>
+      <TeamSection />
+      <div className="px-5 mt-6 text-[14px] text-mute leading-relaxed" style={{ paddingBottom: 'calc(var(--sab) + 120px)' }}>
+        Ingin memantau anak sendiri? Tambahkan profil anak dari menu Akun.
+      </div>
+    </Screen>
   );
 }
 
@@ -165,6 +234,8 @@ function GuestHome() {
             <FeatureCard key={f.key} feature={f} onOpen={() => nav.push(f.route)} />
           ))}
         </motion.div>
+        <TeamSection />
+
         <div className="mt-6">
           <TipCard />
         </div>
@@ -207,6 +278,7 @@ export default function HomeScreen() {
   }, [activeChild, data, profile?.id]);
 
   if (!store.isAuthed) return <GuestHome />;
+  if (!activeChild && profile?.isStaff) return <StaffHome />;
   if (!activeChild || !derived) return null;
 
   const name = activeChild.name;
@@ -428,6 +500,8 @@ export default function HomeScreen() {
             </Button>
           </Card>
         )}
+
+        <TeamSection />
 
         <div className="mt-6">
           <TipCard />

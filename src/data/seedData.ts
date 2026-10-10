@@ -314,9 +314,8 @@ export const ARTICLES_SEED: Article[] = [
       <p class="mb-4">Lakukan skrining perkembangan bahasa secara berkala. Hindari paparan gawai (screen-time) sebelum usia 2 tahun karena gawai bersifat komunikasi satu arah yang menghambat perkembangan motorik bicara anak. Segera konsultasikan ke klinik terapi wicara FlourishCare jika Anda menemui salah satu tanda red flag di atas.</p>
     `,
     coverImageUrl: 'https://images.unsplash.com/photo-1502086223501-7ea6ecd79368?q=80&w=600&auto=format&fit=crop',
-    authorName: 'Ira Amanda, M.Psi., Psikolog',
-    authorCredential: 'Psikolog Klinis Anak & Remaja FlourishCare',
-    reviewedBy: 'Dr. Danang, Sp.A',
+    authorName: 'Tim FlourishCare',
+    authorCredential: 'Psikolog dan terapis anak FlourishCare',
     publishedAt: '2026-06-20',
     seoMeta: {
       title: 'Tanda Red Flag Speech Delay pada Anak 0-3 Tahun | FlourishCare',
@@ -345,9 +344,8 @@ export const ARTICLES_SEED: Article[] = [
       <p class="mb-4">Jika anak terus-menerus terganggu oleh sensitivitas sensorinya hingga memicu tantrum hebat setiap hari, jadwalkan konsultasi dengan Terapis Okupasi (OT) FlourishCare untuk pemeriksaan terfokus dan program okupasi terarah.</p>
     `,
     coverImageUrl: 'https://images.unsplash.com/photo-1596464716127-f2a82984de30?q=80&w=600&auto=format&fit=crop',
-    authorName: 'Rian Hidayat, A.Md.OT',
-    authorCredential: 'Senior Occupational Therapist FlourishCare',
-    reviewedBy: 'Ira Amanda, M.Psi., Psikolog',
+    authorName: 'Tim FlourishCare',
+    authorCredential: 'Psikolog dan terapis anak FlourishCare',
     publishedAt: '2026-06-25',
     seoMeta: {
       title: 'Sensori Integrasi pada Anak Sensitif Tekstur & Suara | FlourishCare',
@@ -375,9 +373,8 @@ export const ARTICLES_SEED: Article[] = [
       <p class="mb-4">Jika tantrum terjadi berkali-kali setiap hari, diiringi perilaku melukai diri (membenturkan kepala, menggigit), menyakiti orang lain, atau berlangsung lebih dari 30 menit setiap kalinya, disarankan berkonsultasi ke Psikolog Anak FlourishCare untuk mengevaluasi apakah ada hambatan neurodevelopmental yang melatarbelakanginya.</p>
     `,
     coverImageUrl: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=600&auto=format&fit=crop',
-    authorName: 'Siti Sarah, M.Psi., Psikolog',
-    authorCredential: 'Psikolog Tumbuh Kembang Anak FlourishCare',
-    reviewedBy: 'Ira Amanda, M.Psi., Psikolog',
+    authorName: 'Tim FlourishCare',
+    authorCredential: 'Psikolog dan terapis anak FlourishCare',
     publishedAt: '2026-06-28',
     seoMeta: {
       title: 'Mengatasi Tantrum & Meltdown Balita Secara Bijak | FlourishCare',
@@ -508,21 +505,6 @@ export const ACTIVITIES_SEED: Activity[] = [
   }
 ];
 
-export interface ClinicalExpert {
-  id: string;
-  name: string;
-  role: string;
-  clinic: string;
-  photoUrl: string;
-  rating: number;
-  years: number;
-  /** Service codes this expert handles (see data/pricing.ts) */
-  services: string[];
-}
-
-export const CLINICAL_EXPERTS: ClinicalExpert[] = [
-  { id: 'exp_ira', name: 'Ira Amanda, M.Psi., Psikolog', role: 'Psikolog anak dan terapi perilaku', clinic: 'Klinik FlourishCare Tebet', photoUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=200&auto=format&fit=crop', rating: 4.9, years: 9, services: ['BT', 'KONSUL', 'EVAL', 'IQ', 'SCHOOL', 'DIAG'] },
-  { id: 'exp_rian', name: 'Rian Hidayat, A.Md.OT', role: 'Terapis okupasi dan sensori integrasi', clinic: 'Klinik Tebet dan home visit', photoUrl: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?q=80&w=200&auto=format&fit=crop', rating: 4.8, years: 7, services: ['SI', 'OT'] },
-  { id: 'exp_siti', name: 'Siti Sarah, M.Psi., Psikolog', role: 'Psikolog tumbuh kembang dan asesmen autisme', clinic: 'Klinik FlourishCare Bintaro', photoUrl: 'https://images.unsplash.com/photo-1594744803329-e58b31de215f?q=80&w=200&auto=format&fit=crop', rating: 4.9, years: 11, services: ['KONSUL', 'EVAL', 'IQ', 'SCHOOL', 'DIAG'] },
-  { id: 'exp_dina', name: 'Dina Lestari, A.Md.TW', role: 'Terapis wicara', clinic: 'Klinik Tebet dan home visit', photoUrl: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?q=80&w=200&auto=format&fit=crop', rating: 4.8, years: 6, services: ['TW'] }
-];
+// The clinical team now comes from data/team.ts (same source as www.flourishcare.id/team)
+export type { ClinicalExpert } from './team';
+export { FALLBACK_TEAM as CLINICAL_EXPERTS } from './team';

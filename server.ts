@@ -2,12 +2,11 @@ import dotenv from 'dotenv';
 // Load environment variables before any other imports/initializations
 dotenv.config();
 
-import express, { Request, Response } from 'express';
+import express, { type Request, type Response } from 'express';
 import path from 'path';
-import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
-import { 
+import type {
   UserProfile, 
   Child, 
   GrowthRecord, 
@@ -18,8 +17,9 @@ import {
   Booking, 
   Notification, 
   NotificationPreferences 
-} from './src/types';
-import { calculatePrice, isTherapyCategory, type ServiceCategory, type PackageSize } from './src/data/pricing';
+} from './src/types.js';
+import { calculatePrice, isTherapyCategory, type ServiceCategory, type PackageSize } from './src/data/pricing.js';
+import { FALLBACK_TEAM, mapStaffProfile, TEAM_SIGNATURE, CLINIC_LOCATION, type ClinicalExpert, type StaffProfileRow } from './src/data/team.js';
 
 /** Keep AI and server copy free of em dashes (house style). */
 function stripEmDash(text: string): string {
@@ -38,7 +38,19 @@ function uid(prefix: string): string {
 const rawSupabaseUrl = process.env.SUPABASE_URL || 'https://vtquhqdfyirccxdzmpyr.supabase.co';
 // Clean raw URL: strip trailing /rest/v1 or /rest/v1/ suffix if present
 const SUPABASE_URL = rawSupabaseUrl.replace(/\/rest\/v1\/?$/, '');
-const SUPABASE_KEY = process.env.SUPABASE_KEY || 'sb_publishable_rV4ay28GgXdI3TgnY3jkJA_YIVVJAKS';
+/** Publishable (anon) key: safe in the browser, used to verify user sessions. */
+const SUPABASE_KEY = process.env.SUPABASE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_rV4ay28GgXdI3TgnY3jkJA_YIVVJAKS';
+/**
+ * Secret (service role) key: server only, never shipped to the browser.
+ * The app tables have Row Level Security enabled, so data access needs this key.
+ */
+const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+
+/** Development helpers. Both stay off in production (Vercel). */
+const DEMO_SEED = process.env.DEMO_SEED === 'true';
+const ALLOW_LEGACY_TOKENS = process.env.ALLOW_LEGACY_TOKENS === 'true';
+/** When true, questions get an instant AI reply labelled as such. Default: wait for a real expert. */
+const QA_AUTO_ANSWER = process.env.QA_AUTO_ANSWER === 'true';
 
 /**
  * Circuit breaker around Supabase network calls. When the database host is
@@ -68,7 +80,18 @@ const supabaseFetch: typeof fetch = async (input, init) => {
   }
 };
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, { global: { fetch: supabaseFetch } });
+const serverAuthOptions = { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false };
+/** Data client: secret key when configured (bypasses RLS), otherwise the publishable key. */
+const supabase = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY || SUPABASE_KEY, { auth: serverAuthOptions, global: { fetch: supabaseFetch } });
+/** Auth client: verifies the access tokens that the app sends. */
+const supabaseAuth = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: serverAuthOptions, global: { fetch: supabaseFetch } });
+/** Client acting as the signed-in user (for RPCs protected by RLS such as get_my_profile). */
+function supabaseAsUser(accessToken: string) {
+  return createClient(SUPABASE_URL, SUPABASE_KEY, {
+    auth: serverAuthOptions,
+    global: { fetch: supabaseFetch, headers: { Authorization: `Bearer ${accessToken}` } },
+  });
+}
 
 function isTableMissingError(err: any): boolean {
   if (!err) return false;
@@ -93,7 +116,7 @@ if (process.env.GEMINI_API_KEY) {
 }
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '3mb' }));
 
 const PORT = Number(process.env.PORT) || 3000;
 
@@ -207,9 +230,9 @@ const PORT = Number(process.env.PORT) || 3000;
       childId: 'c_aiden',
       questionText: 'Anak saya usia 18 bulan, tapi kalau dipanggil namanya kadang menoleh kadang tidak, dan belum banyak kata yang keluar secara jelas selain "mam" dan "na". Apakah ini tanda speech delay atau butuh pemeriksaan sensori integrasi?',
       status: 'answered',
-      answerText: 'Halo Ibu Amanda. Pada usia 18 bulan, idealnya anak sudah menguasai minimal 6-10 kata tunggal bermakna secara konsisten dan responsif menoleh seketika saat dipanggil namanya. Jika Aiden masih jarang menoleh, perlu dipastikan apakah ada masalah pendengaran atau hambatan atensi/sensori taktil/auditori. Sebaiknya perhatikan juga koordinasi kontak matanya. Kami menyarankan untuk melakukan skrining keterlambatan bicara terfokus di aplikasi ini, dan jika ada indikasi red-flag, jadwalkan janji temu dengan Terapis Wicara atau Terapis Okupasi FlourishCare di klinik Tebet untuk pemeriksaan langsung yang komprehensif. Semangat mendampingi tumbuh kembang Aiden ya bu!',
-      answeredBy: 'Ira Amanda, M.Psi., Psikolog',
-      isPublic: true,
+      answerText: 'Halo Ibu Amanda. Pada usia 18 bulan, idealnya anak sudah menguasai minimal 6-10 kata tunggal bermakna secara konsisten dan responsif menoleh seketika saat dipanggil namanya. Jika Aiden masih jarang menoleh, perlu dipastikan apakah ada masalah pendengaran atau hambatan atensi/sensori taktil/auditori. Sebaiknya perhatikan juga koordinasi kontak matanya. Kami menyarankan untuk melakukan skrining keterlambatan bicara terfokus di aplikasi ini, dan jika ada indikasi red-flag, jadwalkan janji temu dengan terapis FlourishCare di Klinik Mitra Diani untuk pemeriksaan langsung yang komprehensif. Semangat mendampingi tumbuh kembang Aiden ya bu!',
+      answeredBy: 'Tim FlourishCare',
+      isPublic: false,
       createdAt: '2026-06-10T15:00:00Z',
       answeredAt: '2026-06-11T09:30:00Z'
     }
@@ -224,8 +247,8 @@ const PORT = Number(process.env.PORT) || 3000;
       serviceType: 'onsite',
       subService: 'Terapi Okupasi (Sensori Integrasi)',
       packageName: 'Sesi Tunggal (1 Jam Evaluasi)',
-      therapistId: 'exp_rian',
-      therapistName: 'Rian Hidayat, A.Md.OT',
+      therapistId: 'putri-solihah',
+      therapistName: 'Putri Solihah, Terapis Anak',
       scheduledAt: '2026-07-10T10:00:00.000Z',
       status: 'paid',
       amount: 250000,
@@ -243,7 +266,7 @@ const PORT = Number(process.env.PORT) || 3000;
       parentId: 'u_amanda',
       type: 'booking',
       title: 'Pembayaran Berhasil!',
-      body: 'Pembayaran untuk booking Terapi Okupasi (Sensori Integrasi) Aiden di Klinik Tebet pada 10 Juli 2026 pukul 10:00 WIB telah diverifikasi.',
+      body: 'Pembayaran untuk booking Terapi Okupasi (Sensori Integrasi) Aiden di Klinik Mitra Diani pada 10 Juli 2026 pukul 10:00 WIB telah diverifikasi.',
       deepLink: 'bookings',
       read: true,
       createdAt: '2026-06-29T11:25:00Z'
@@ -326,17 +349,173 @@ const PORT = Number(process.env.PORT) || 3000;
     }
   ];
 
-  function getUserId(req: Request): string {
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      return authHeader.substring(7).trim();
-    }
-    return 'u_amanda'; // fallback
+  // Demo data exists only for local development (DEMO_SEED=true). Production starts empty.
+  if (!DEMO_SEED) {
+    children = [];
+    growthRecords = [];
+    childMilestones = [];
+    childImmunizations = [];
+    screenings = [];
+    questions = [];
+    bookings = [];
+    notifications = [];
+    userAccounts = [];
+    userProfiles = [];
+    notificationPreferencesList = [];
   }
 
-  async function getProfile(userId: string): Promise<UserProfile> {
+  // ==========================================
+  // AUTHENTICATION (Supabase Auth, shared with www and book.flourishcare.id)
+  // ==========================================
+
+  interface AuthUser {
+    id: string;
+    email: string;
+    meta: Record<string, any>;
+    accessToken: string;
+    legacy?: boolean;
+  }
+
+  class AuthUnavailableError extends Error {}
+
+  const tokenCache = new Map<string, { user: AuthUser; until: number }>();
+
+  function jwtExpiry(token: string): number | null {
     try {
-      const { data, error } = await supabase.from('app_profiles').select('*').eq('id', userId).single();
+      const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
+      return typeof payload.exp === 'number' ? payload.exp * 1000 : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Verify a Supabase access token. Throws AuthUnavailableError when Supabase cannot be reached. */
+  async function verifyAccessToken(token: string): Promise<AuthUser | null> {
+    const cached = tokenCache.get(token);
+    if (cached && cached.until > Date.now()) return cached.user;
+
+    if (token.split('.').length === 3) {
+      const exp = jwtExpiry(token);
+      if (exp && exp < Date.now()) return null;
+      const { data, error } = await supabaseAuth.auth.getUser(token);
+      if (error || !data?.user) {
+        const status = (error as any)?.status;
+        if (!status || status >= 500 || error?.name === 'AuthRetryableFetchError') throw new AuthUnavailableError('auth unavailable');
+        return null;
+      }
+      const user: AuthUser = {
+        id: data.user.id,
+        email: (data.user.email || '').toLowerCase(),
+        meta: { ...(data.user.user_metadata || {}) },
+        accessToken: token,
+      };
+      if (tokenCache.size > 1000) tokenCache.clear();
+      tokenCache.set(token, { user, until: Math.min(exp ?? Infinity, Date.now() + 5 * 60 * 1000) });
+      return user;
+    }
+
+    // Old style tokens (the raw user id) are only accepted in local development.
+    if (ALLOW_LEGACY_TOKENS && (userAccounts.some((a) => a.id === token) || userProfiles.some((p) => p.id === token))) {
+      const account = userAccounts.find((a) => a.id === token);
+      return { id: token, email: account?.email || '', meta: {}, accessToken: token, legacy: true };
+    }
+    return null;
+  }
+
+  const PUBLIC_API = [/^\/api\/supabase-status/, /^\/api\/experts/, /^\/api\/health/, /^\/api\/auth\/(login|register|logout)/];
+
+  app.use('/api', async (req: Request, res: Response, next) => {
+    const url = req.originalUrl.split('?')[0];
+    const isPublic = PUBLIC_API.some((re) => re.test(url));
+    const header = req.headers.authorization || '';
+    const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
+    if (!token) {
+      if (isPublic) return next();
+      return res.status(401).json({ error: 'unauthorized', message: 'Silakan masuk terlebih dahulu.' });
+    }
+    try {
+      const user = await verifyAccessToken(token);
+      if (user) {
+        (req as any).authUser = user;
+        return next();
+      }
+      if (isPublic) return next();
+      return res.status(401).json({ error: 'unauthorized', message: 'Sesi berakhir. Silakan masuk lagi.' });
+    } catch (err) {
+      if (isPublic) return next();
+      return res.status(503).json({ error: 'auth_unavailable', message: 'Layanan sedang sibuk. Coba lagi sebentar lagi.' });
+    }
+  });
+
+  function getAuthUser(req: Request): AuthUser | null {
+    return ((req as any).authUser as AuthUser) || null;
+  }
+
+  function getUserId(req: Request): string {
+    return getAuthUser(req)?.id || '';
+  }
+
+  /** Staff status comes from the clinic dashboard (RPC get_my_profile), cached per user. */
+  const staffCache = new Map<string, { isStaff: boolean; name?: string; until: number }>();
+
+  async function getStaffInfo(user: AuthUser | null): Promise<{ isStaff: boolean; name?: string }> {
+    if (!user) return { isStaff: false };
+    if (user.legacy) return { isStaff: DEMO_SEED && user.id === 'u_amanda', name: TEAM_SIGNATURE };
+    const cached = staffCache.get(user.id);
+    if (cached && cached.until > Date.now()) return cached;
+    let info: { isStaff: boolean; name?: string } = { isStaff: false };
+    try {
+      const { data, error } = await supabaseAsUser(user.accessToken).rpc('get_my_profile');
+      const row = Array.isArray(data) ? data[0] : data;
+      if (!error && row && row.is_staff === true) {
+        const experts = await getExperts();
+        const linked = experts.find((e) => e.profileId === user.id);
+        info = { isStaff: true, name: linked?.name || row.full_name || row.name || TEAM_SIGNATURE };
+      }
+    } catch {
+      /* not staff, or dashboard RPC unavailable */
+    }
+    staffCache.set(user.id, { ...info, until: Date.now() + 10 * 60 * 1000 });
+    return info;
+  }
+
+  /** The child must belong to the signed-in parent (staff may read for answering questions). */
+  async function ownsChild(userId: string, childId: string | undefined | null): Promise<boolean> {
+    if (!userId || !childId) return false;
+    const kids = await getChildren(userId);
+    return kids.some((c) => c.id === childId);
+  }
+
+  // ==========================================
+  // CLINICAL TEAM (staff_profiles, same source as www.flourishcare.id/team)
+  // ==========================================
+
+  let expertsCache: { list: ClinicalExpert[]; until: number; source: 'supabase' | 'fallback' } | null = null;
+
+  async function getExperts(): Promise<ClinicalExpert[]> {
+    if (expertsCache && expertsCache.until > Date.now()) return expertsCache.list;
+    try {
+      const { data, error } = await supabase
+        .from('staff_profiles')
+        .select('*')
+        .eq('is_visible', true)
+        .order('display_order', { ascending: true });
+      if (error) throw error;
+      if (Array.isArray(data) && data.length) {
+        expertsCache = { list: (data as StaffProfileRow[]).map(mapStaffProfile), until: Date.now() + 10 * 60 * 1000, source: 'supabase' };
+        return expertsCache.list;
+      }
+    } catch (err: any) {
+      console.warn('staff_profiles unavailable, using website fallback:', err?.message || err);
+    }
+    expertsCache = { list: FALLBACK_TEAM, until: Date.now() + 60 * 1000, source: 'fallback' };
+    return expertsCache.list;
+  }
+
+  /** Profile lookup without side effects: null when the user has no app profile yet. */
+  async function findProfile(userId: string): Promise<UserProfile | null> {
+    try {
+      const { data, error } = await supabase.from('app_profiles').select('*').eq('id', userId).maybeSingle();
       if (error) {
         if (error.code === 'PGRST116') {
           console.log(`Profile "${userId}" not found in Supabase.`);
@@ -363,9 +542,13 @@ const PORT = Number(process.env.PORT) || 3000;
       }
     }
     
-    const memProf = userProfiles.find(p => p.id === userId);
-    if (memProf) return memProf;
-    
+    return userProfiles.find(p => p.id === userId) ?? null;
+  }
+
+  async function getProfile(userId: string): Promise<UserProfile> {
+    const found = await findProfile(userId);
+    if (found) return found;
+
     // Create lazy default profile
     const newProf: UserProfile = {
       id: userId,
@@ -381,24 +564,30 @@ const PORT = Number(process.env.PORT) || 3000;
   }
 
   async function updateProfile(userId: string, update: Partial<UserProfile>): Promise<UserProfile> {
-    let existing = userProfiles.find(p => p.id === userId);
-    if (existing) {
-      Object.assign(existing, update);
-    } else {
-      existing = {
-        id: userId,
-        fullName: update.fullName || 'Ayah / Bunda',
-        phoneWhatsapp: update.phoneWhatsapp || '',
-        email: update.email || '',
-        city: update.city || '',
-        role: update.role || 'parent',
-        createdAt: new Date().toISOString()
-      };
-      userProfiles.push(existing);
-    }
+    // Merge onto the stored profile so a partial update never wipes other fields
+    const current = (await findProfile(userId)) ?? {
+      id: userId,
+      fullName: 'Ayah / Bunda',
+      phoneWhatsapp: '',
+      email: '',
+      city: '',
+      role: 'parent' as const,
+      createdAt: new Date().toISOString()
+    };
+    const clean: Partial<UserProfile> = {};
+    if (typeof update.fullName === 'string' && update.fullName.trim()) clean.fullName = update.fullName.trim().slice(0, 120);
+    if (typeof update.phoneWhatsapp === 'string') clean.phoneWhatsapp = update.phoneWhatsapp.trim().slice(0, 20);
+    if (typeof update.email === 'string') clean.email = update.email.trim().toLowerCase().slice(0, 160);
+    if (typeof update.city === 'string') clean.city = update.city.trim().slice(0, 80);
+    if (update.role === 'parent' || update.role === 'caregiver') clean.role = update.role;
+    const existing: UserProfile = { ...current, ...clean, id: userId };
+
+    const memIndex = userProfiles.findIndex(p => p.id === userId);
+    if (memIndex === -1) userProfiles.push(existing);
+    else userProfiles[memIndex] = existing;
 
     try {
-      await supabase.from('app_profiles').upsert({
+      const { error } = await supabase.from('app_profiles').upsert({
         id: userId,
         full_name: existing.fullName,
         phone_whatsapp: existing.phoneWhatsapp,
@@ -406,6 +595,7 @@ const PORT = Number(process.env.PORT) || 3000;
         city: existing.city,
         role: existing.role,
       });
+      if (error) throw error;
     } catch (err: any) {
       console.warn('Supabase updateProfile failed, updated memory only:', err.message || err);
     }
@@ -448,7 +638,7 @@ const PORT = Number(process.env.PORT) || 3000;
       children.push(child);
     }
     try {
-      await supabase.from('app_children').upsert({
+      const { error: dbError } = await supabase.from('app_children').upsert({
         id: child.id,
         parent_id: child.parentId,
         name: child.name,
@@ -460,6 +650,7 @@ const PORT = Number(process.env.PORT) || 3000;
         medical_notes: child.medicalNotes,
         created_at: child.createdAt
       });
+      if (dbError) throw dbError;
     } catch (err: any) {
       console.warn('Supabase saveChild failed, updated memory only:', err.message || err);
     }
@@ -473,7 +664,8 @@ const PORT = Number(process.env.PORT) || 3000;
     screenings = screenings.filter(s => s.childId !== childId);
 
     try {
-      await supabase.from('app_children').delete().eq('id', childId);
+      const { error: dbError } = await supabase.from('app_children').delete().eq('id', childId);
+      if (dbError) throw dbError;
     } catch (err: any) {
       console.warn('Supabase deleteChild failed, updated memory only:', err.message || err);
     }
@@ -508,7 +700,7 @@ const PORT = Number(process.env.PORT) || 3000;
   async function saveGrowthRecord(record: GrowthRecord): Promise<void> {
     growthRecords.push(record);
     try {
-      await supabase.from('app_growth_records').insert({
+      const { error: dbError } = await supabase.from('app_growth_records').insert({
         id: record.id,
         child_id: record.childId,
         date: record.date,
@@ -518,6 +710,7 @@ const PORT = Number(process.env.PORT) || 3000;
         notes: record.notes,
         created_at: record.createdAt
       });
+      if (dbError) throw dbError;
     } catch (err: any) {
       console.warn('Supabase saveGrowthRecord failed, updated memory only:', err.message || err);
     }
@@ -526,7 +719,8 @@ const PORT = Number(process.env.PORT) || 3000;
   async function deleteGrowthRecord(id: string): Promise<void> {
     growthRecords = growthRecords.filter(g => g.id !== id);
     try {
-      await supabase.from('app_growth_records').delete().eq('id', id);
+      const { error: dbError } = await supabase.from('app_growth_records').delete().eq('id', id);
+      if (dbError) throw dbError;
     } catch (err: any) {
       console.warn('Supabase deleteGrowthRecord failed, updated memory only:', err.message || err);
     }
@@ -564,7 +758,7 @@ const PORT = Number(process.env.PORT) || 3000;
       childMilestones.push(m);
     }
     try {
-      await supabase.from('app_child_milestones').upsert({
+      const { error: dbError } = await supabase.from('app_child_milestones').upsert({
         id: m.id,
         child_id: m.childId,
         milestone_id: m.milestoneId,
@@ -572,6 +766,7 @@ const PORT = Number(process.env.PORT) || 3000;
         achieved_date: m.achievedDate,
         created_at: m.createdAt
       });
+      if (dbError) throw dbError;
     } catch (err: any) {
       console.warn('Supabase saveChildMilestone failed, updated memory only:', err.message || err);
     }
@@ -580,7 +775,8 @@ const PORT = Number(process.env.PORT) || 3000;
   async function deleteChildMilestone(childId: string, milestoneId: string): Promise<void> {
     childMilestones = childMilestones.filter(item => !(item.childId === childId && item.milestoneId === milestoneId));
     try {
-      await supabase.from('app_child_milestones').delete().eq('child_id', childId).eq('milestone_id', milestoneId);
+      const { error: dbError } = await supabase.from('app_child_milestones').delete().eq('child_id', childId).eq('milestone_id', milestoneId);
+      if (dbError) throw dbError;
     } catch (err: any) {
       console.warn('Supabase deleteChildMilestone failed, updated memory only:', err.message || err);
     }
@@ -618,7 +814,7 @@ const PORT = Number(process.env.PORT) || 3000;
       childImmunizations.push(i);
     }
     try {
-      await supabase.from('app_child_immunizations').upsert({
+      const { error: dbError } = await supabase.from('app_child_immunizations').upsert({
         id: i.id,
         child_id: i.childId,
         immunization_id: i.immunizationId,
@@ -626,6 +822,7 @@ const PORT = Number(process.env.PORT) || 3000;
         proof_photo_url: i.proofPhotoUrl,
         created_at: i.createdAt
       });
+      if (dbError) throw dbError;
     } catch (err: any) {
       console.warn('Supabase saveChildImmunization failed, updated memory only:', err.message || err);
     }
@@ -634,7 +831,8 @@ const PORT = Number(process.env.PORT) || 3000;
   async function deleteChildImmunization(childId: string, immunizationId: string): Promise<void> {
     childImmunizations = childImmunizations.filter(item => !(item.childId === childId && item.immunizationId === immunizationId));
     try {
-      await supabase.from('app_child_immunizations').delete().eq('child_id', childId).eq('immunization_id', immunizationId);
+      const { error: dbError } = await supabase.from('app_child_immunizations').delete().eq('child_id', childId).eq('immunization_id', immunizationId);
+      if (dbError) throw dbError;
     } catch (err: any) {
       console.warn('Supabase deleteChildImmunization failed, updated memory only:', err.message || err);
     }
@@ -671,7 +869,7 @@ const PORT = Number(process.env.PORT) || 3000;
   async function saveScreening(s: Screening): Promise<void> {
     screenings.push(s);
     try {
-      await supabase.from('app_screenings').insert({
+      const { error: dbError } = await supabase.from('app_screenings').insert({
         id: s.id,
         child_id: s.childId,
         type: s.type,
@@ -683,6 +881,7 @@ const PORT = Number(process.env.PORT) || 3000;
         pdf_url: s.pdfUrl,
         created_at: s.createdAt
       });
+      if (dbError) throw dbError;
     } catch (err: any) {
       console.warn('Supabase saveScreening failed, updated memory only:', err.message || err);
     }
@@ -702,6 +901,7 @@ const PORT = Number(process.env.PORT) || 3000;
           answerText: item.answer_text,
           answeredBy: item.answered_by,
           isPublic: item.is_public,
+          category: item.category ?? undefined,
           createdAt: item.created_at,
           answeredAt: item.answered_at
         })).sort((a,b) => b.createdAt.localeCompare(a.createdAt));
@@ -724,7 +924,7 @@ const PORT = Number(process.env.PORT) || 3000;
       questions.push(q);
     }
     try {
-      await supabase.from('app_questions').upsert({
+      const { error: dbError } = await supabase.from('app_questions').upsert({
         id: q.id,
         parent_id: q.parentId,
         child_id: q.childId,
@@ -733,9 +933,11 @@ const PORT = Number(process.env.PORT) || 3000;
         answer_text: q.answerText,
         answered_by: q.answeredBy,
         is_public: q.isPublic,
+        category: q.category ?? null,
         created_at: q.createdAt,
         answered_at: q.answeredAt
       });
+      if (dbError) throw dbError;
     } catch (err: any) {
       console.warn('Supabase saveQuestion failed, updated memory only:', err.message || err);
     }
@@ -761,6 +963,8 @@ const PORT = Number(process.env.PORT) || 3000;
           paymentStatus: item.payment_status as any,
           midtransOrderId: item.midtrans_order_id,
           bookingCode: item.booking_code,
+          address: item.address ?? undefined,
+          paymentMethod: item.payment_method ?? undefined,
           createdAt: item.created_at
         })).sort((a,b) => b.scheduledAt.localeCompare(a.scheduledAt));
       }
@@ -782,7 +986,7 @@ const PORT = Number(process.env.PORT) || 3000;
       bookings.push(b);
     }
     try {
-      await supabase.from('app_bookings').upsert({
+      const { error: dbError } = await supabase.from('app_bookings').upsert({
         id: b.id,
         parent_id: b.parentId,
         child_id: b.childId,
@@ -797,8 +1001,11 @@ const PORT = Number(process.env.PORT) || 3000;
         payment_status: b.paymentStatus,
         midtrans_order_id: b.midtransOrderId,
         booking_code: b.bookingCode,
+        address: b.address ?? null,
+        payment_method: b.paymentMethod ?? null,
         created_at: b.createdAt
       });
+      if (dbError) throw dbError;
     } catch (err: any) {
       console.warn('Supabase saveBooking failed, updated memory only:', err.message || err);
     }
@@ -833,7 +1040,7 @@ const PORT = Number(process.env.PORT) || 3000;
   async function addNotification(n: Notification): Promise<void> {
     notifications.unshift(n);
     try {
-      await supabase.from('app_notifications').insert({
+      const { error: dbError } = await supabase.from('app_notifications').insert({
         id: n.id,
         parent_id: n.parentId,
         type: n.type,
@@ -843,6 +1050,7 @@ const PORT = Number(process.env.PORT) || 3000;
         read: n.read,
         created_at: n.createdAt
       });
+      if (dbError) throw dbError;
     } catch (err: any) {
       console.warn('Supabase addNotification failed, updated memory only:', err.message || err);
     }
@@ -855,7 +1063,8 @@ const PORT = Number(process.env.PORT) || 3000;
       }
     });
     try {
-      await supabase.from('app_notifications').update({ read: true }).eq('parent_id', userId);
+      const { error: dbError } = await supabase.from('app_notifications').update({ read: true }).eq('parent_id', userId);
+      if (dbError) throw dbError;
     } catch (err: any) {
       console.warn('Supabase markAllNotificationsRead failed, updated memory only:', err.message || err);
     }
@@ -918,7 +1127,7 @@ const PORT = Number(process.env.PORT) || 3000;
     }
 
     try {
-      await supabase.from('app_preferences').upsert({
+      const { error: dbError } = await supabase.from('app_preferences').upsert({
         parent_id: userId,
         push_enabled: existing.pushEnabled,
         whatsapp_enabled: existing.whatsappEnabled,
@@ -927,6 +1136,7 @@ const PORT = Number(process.env.PORT) || 3000;
         immunization_reminder: existing.immunizationReminder,
         milestone_reminder: existing.milestoneReminder
       });
+      if (dbError) throw dbError;
     } catch (err: any) {
       console.warn('Supabase savePreferences failed, updated memory only:', err.message || err);
     }
@@ -937,41 +1147,37 @@ const PORT = Number(process.env.PORT) || 3000;
   // REST API ENDPOINTS
   // ==========================================
 
-  // Supabase Connection Health Status
-  app.get('/api/supabase-status', async (req: Request, res: Response) => {
+  // Supabase Connection Health Status (no secrets in the response)
+  app.get('/api/supabase-status', async (_req: Request, res: Response) => {
+    const base = { project: SUPABASE_URL.replace(/^https?:\/\//, '').split('.')[0], secretKey: !!SUPABASE_SECRET_KEY };
     try {
-      console.log('DEBUG: Current SUPABASE_URL in server.ts:', SUPABASE_URL);
-      console.log('DEBUG: Current SUPABASE_KEY prefix in server.ts:', SUPABASE_KEY ? SUPABASE_KEY.substring(0, 10) + '...' : 'undefined');
-      
       const { error } = await supabase.from('app_profiles').select('id').limit(1);
       if (error) {
+        const missing = isTableMissingError(error);
         return res.json({
-          connected: false,
+          ...base,
+          connected: !missing ? false : true,
+          tablesReady: false,
           error: error.message,
-          url: SUPABASE_URL,
-          keyLength: SUPABASE_KEY ? SUPABASE_KEY.length : 0,
-          keyPrefix: SUPABASE_KEY ? SUPABASE_KEY.substring(0, 5) : '',
-          hint: 'Tabel app_profiles belum ada. Silakan salin & jalankan skrip SQL skema di Supabase SQL Editor Anda.'
+          hint: missing
+            ? 'Tabel aplikasi belum ada. Jalankan skema SQL (menu Akun, Tentang FlourishCare) di Supabase SQL Editor.'
+            : SUPABASE_SECRET_KEY
+              ? 'Periksa SUPABASE_SECRET_KEY di Vercel.'
+              : 'Tambahkan SUPABASE_SECRET_KEY di Vercel agar server bisa membaca tabel yang dilindungi RLS.',
         });
       }
-      res.json({
-        connected: true,
-        url: SUPABASE_URL,
-        project: 'vtquhqdfyirccxdzmpyr',
-        info: 'Supabase terhubung dengan sukses secara real-time!'
-      });
+      res.json({ ...base, connected: true, tablesReady: true, info: 'Supabase terhubung. Data tersimpan permanen.' });
     } catch (err: any) {
-      res.json({
-        connected: false,
-        error: err.message || 'Network/Connection error',
-        url: SUPABASE_URL,
-        hint: 'Periksa variabel lingkungan Supabase Anda.'
-      });
+      res.json({ ...base, connected: false, tablesReady: false, error: err.message || 'Network/Connection error', hint: 'Periksa koneksi dan variabel lingkungan Supabase.' });
     }
   });
 
   // Auth / Profile Endpoints
+  // Legacy email/password endpoints (memory only). Production uses Supabase Auth from the app.
   app.post('/api/auth/register', async (req: Request, res: Response) => {
+    if (!ALLOW_LEGACY_TOKENS) {
+      return res.status(410).json({ error: 'gone', message: 'Muat ulang aplikasi untuk menggunakan halaman masuk terbaru.' });
+    }
     try {
       const { email, password, fullName, phoneWhatsapp, city, role } = req.body;
       if (!email || !password || !fullName) {
@@ -1013,7 +1219,7 @@ const PORT = Number(process.env.PORT) || 3000;
 
       // Save to Supabase if connected
       try {
-        await supabase.from('app_profiles').upsert({
+        const { error: dbError } = await supabase.from('app_profiles').upsert({
           id: userId,
           full_name: newProfile.fullName,
           phone_whatsapp: newProfile.phoneWhatsapp,
@@ -1021,6 +1227,7 @@ const PORT = Number(process.env.PORT) || 3000;
           city: newProfile.city,
           role: newProfile.role,
         });
+        if (dbError) throw dbError;
       } catch (sbErr) {
         console.warn('Could not save registered profile to Supabase, using local memory storage only.');
       }
@@ -1063,6 +1270,9 @@ const PORT = Number(process.env.PORT) || 3000;
   });
 
   app.post('/api/auth/login', async (req: Request, res: Response) => {
+    if (!ALLOW_LEGACY_TOKENS) {
+      return res.status(410).json({ error: 'gone', message: 'Muat ulang aplikasi untuk menggunakan halaman masuk terbaru.' });
+    }
     try {
       const { email, password } = req.body;
       if (!email || !password) {
@@ -1092,17 +1302,91 @@ const PORT = Number(process.env.PORT) || 3000;
     res.json({ success: true });
   });
 
+  function localPhone(raw: unknown): string {
+    const digits = String(raw || '').replace(/[^0-9+]/g, '');
+    if (digits.startsWith('+62')) return '0' + digits.slice(3);
+    if (digits.startsWith('62')) return '0' + digits.slice(2);
+    return digits;
+  }
+
+  /**
+   * Called by the app right after Supabase sign-in (Google or email).
+   * Creates the app profile on first visit and returns it with staff status.
+   */
+  app.post('/api/auth/session', async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    if (!user) return res.status(401).json({ error: 'unauthorized', message: 'Silakan masuk terlebih dahulu.' });
+    const meta = user.meta || {};
+    const providerName = String(meta.full_name || meta.name || '').trim();
+    const phone = localPhone(meta.whatsapp || meta.phone || '');
+    const existing = await findProfile(user.id);
+    let profile: UserProfile;
+    let isNew = false;
+
+    if (!existing) {
+      isNew = true;
+      profile = await updateProfile(user.id, {
+        fullName: providerName || user.email.split('@')[0] || 'Ayah / Bunda',
+        email: user.email,
+        phoneWhatsapp: phone,
+        city: String(meta.city || ''),
+        role: meta.sub_role === 'wali' ? 'caregiver' : 'parent',
+      });
+      await addNotification({
+        id: uid('n_welcome_'),
+        parentId: user.id,
+        type: 'weekly_digest',
+        title: `Selamat datang, ${profile.fullName.split(' ')[0]}`,
+        body: 'Terima kasih sudah bergabung di FlourishCare. Mulai dengan menambahkan profil si Kecil, lalu pantau pertumbuhan, milestone, dan imunisasinya di satu tempat.',
+        deepLink: 'home',
+        read: false,
+        createdAt: new Date().toISOString()
+      });
+    } else {
+      const patch: Partial<UserProfile> = {};
+      if (!existing.email && user.email) patch.email = user.email;
+      if (!existing.phoneWhatsapp && phone) patch.phoneWhatsapp = phone;
+      if ((!existing.fullName || existing.fullName === 'Ayah / Bunda') && providerName) patch.fullName = providerName;
+      profile = Object.keys(patch).length ? await updateProfile(user.id, patch) : existing;
+    }
+
+    const staff = await getStaffInfo(user);
+    res.json({
+      user: { ...profile, isStaff: staff.isStaff, avatarUrl: meta.avatar_url || meta.picture || undefined },
+      isNew,
+    });
+  });
+
   app.get('/api/profile', async (req: Request, res: Response) => {
-    const userId = getUserId(req);
-    const prof = await getProfile(userId);
-    res.json(prof);
+    const user = getAuthUser(req);
+    const prof = await getProfile(getUserId(req));
+    const staff = await getStaffInfo(user);
+    res.json({ ...prof, isStaff: staff.isStaff, avatarUrl: user?.meta?.avatar_url || user?.meta?.picture || undefined });
   });
 
   app.put('/api/profile', async (req: Request, res: Response) => {
     const userId = getUserId(req);
-    const prof = await updateProfile(userId, req.body);
+    const { email: _ignoredEmail, role: _ignoredRole, id: _ignoredId, ...editable } = req.body || {};
+    const prof = await updateProfile(userId, editable);
     res.json(prof);
   });
+
+  app.get('/api/experts', async (_req: Request, res: Response) => {
+    const list = await getExperts();
+    res.set('Cache-Control', 'public, max-age=300');
+    res.json(list);
+  });
+
+  app.get('/api/health', (_req: Request, res: Response) => {
+    res.json({ ok: true });
+  });
+
+  /** Sends 404 and returns false when the child is not one of the signed-in parent's children. */
+  async function guardChild(req: Request, res: Response, childId: unknown): Promise<boolean> {
+    if (typeof childId === 'string' && (await ownsChild(getUserId(req), childId))) return true;
+    res.status(404).json({ error: 'not_found', message: 'Profil anak tidak ditemukan.' });
+    return false;
+  }
 
   // Children Endpoints
   app.get('/api/children', async (req: Request, res: Response) => {
@@ -1150,7 +1434,8 @@ const PORT = Number(process.env.PORT) || 3000;
     const list = await getChildren(userId);
     const index = list.findIndex(c => c.id === id);
     if (index !== -1) {
-      const updated = { ...list[index], ...req.body };
+      const { id: _id, parentId: _parentId, createdAt: _createdAt, ...changes } = req.body || {};
+      const updated = { ...list[index], ...changes };
       await saveChild(updated);
       res.json(updated);
     } else {
@@ -1160,6 +1445,7 @@ const PORT = Number(process.env.PORT) || 3000;
 
   app.delete('/api/children/:id', async (req: Request, res: Response) => {
     const { id } = req.params;
+    if (!(await guardChild(req, res, id))) return;
     await deleteChild(id);
     res.json({ success: true });
   });
@@ -1167,11 +1453,13 @@ const PORT = Number(process.env.PORT) || 3000;
   // Growth Records Endpoints
   app.get('/api/growth/:childId', async (req: Request, res: Response) => {
     const { childId } = req.params;
+    if (!(await guardChild(req, res, childId))) return;
     const records = await getGrowthRecords(childId);
     res.json(records);
   });
 
   app.post('/api/growth', async (req: Request, res: Response) => {
+    if (!(await guardChild(req, res, req.body?.childId))) return;
     const record: GrowthRecord = {
       id: uid('g_'),
       childId: req.body.childId,
@@ -1188,6 +1476,12 @@ const PORT = Number(process.env.PORT) || 3000;
 
   app.delete('/api/growth/:id', async (req: Request, res: Response) => {
     const { id } = req.params;
+    const childId = String(req.query.childId || '');
+    if (!(await guardChild(req, res, childId))) return;
+    const records = await getGrowthRecords(childId);
+    if (!records.some(r => r.id === id)) {
+      return res.status(404).json({ error: 'not_found', message: 'Data pengukuran tidak ditemukan.' });
+    }
     await deleteGrowthRecord(id);
     res.json({ success: true });
   });
@@ -1195,12 +1489,14 @@ const PORT = Number(process.env.PORT) || 3000;
   // Milestone Progress Endpoints
   app.get('/api/milestones/:childId', async (req: Request, res: Response) => {
     const { childId } = req.params;
+    if (!(await guardChild(req, res, childId))) return;
     const list = await getChildMilestones(childId);
     res.json(list);
   });
 
   app.post('/api/milestones/toggle', async (req: Request, res: Response) => {
     const { childId, milestoneId, achieved } = req.body;
+    if (!(await guardChild(req, res, childId))) return;
     
     const list = await getChildMilestones(childId);
     const existingIndex = list.findIndex(
@@ -1238,12 +1534,14 @@ const PORT = Number(process.env.PORT) || 3000;
   // Immunization Endpoints
   app.get('/api/immunization/:childId', async (req: Request, res: Response) => {
     const { childId } = req.params;
+    if (!(await guardChild(req, res, childId))) return;
     const list = await getChildImmunizations(childId);
     res.json(list);
   });
 
   app.post('/api/immunization/toggle', async (req: Request, res: Response) => {
     const { childId, immunizationId, givenDate, proofPhotoUrl } = req.body;
+    if (!(await guardChild(req, res, childId))) return;
 
     const list = await getChildImmunizations(childId);
     const existingIndex = list.findIndex(
@@ -1282,11 +1580,13 @@ const PORT = Number(process.env.PORT) || 3000;
   // Clinical Screenings Endpoints
   app.get('/api/screenings/:childId', async (req: Request, res: Response) => {
     const { childId } = req.params;
+    if (!(await guardChild(req, res, childId))) return;
     const list = await getScreenings(childId);
     res.json(list);
   });
 
   app.post('/api/screenings', async (req: Request, res: Response) => {
+    if (!(await guardChild(req, res, req.body?.childId))) return;
     const userId = getUserId(req);
     const activeProf = await getProfile(userId);
     const screening: Screening = {
@@ -1329,8 +1629,11 @@ const PORT = Number(process.env.PORT) || 3000;
     const userId = getUserId(req);
     const activeProf = await getProfile(userId);
     const list = await getQuestions();
-    // Return all public questions plus active user's questions
-    const filtered = list.filter(q => q.isPublic || q.parentId === activeProf.id);
+    const staff = await getStaffInfo(getAuthUser(req));
+    // Staff see every question so they can answer; parents see public answered questions plus their own
+    const filtered = staff.isStaff
+      ? list
+      : list.filter(q => q.parentId === activeProf.id || (q.isPublic && q.status === 'answered'));
     res.json(filtered.sort((a,b) => b.createdAt.localeCompare(a.createdAt)));
   });
 
@@ -1361,10 +1664,15 @@ const PORT = Number(process.env.PORT) || 3000;
       return res.status(400).json({ error: 'Pertanyaan terlalu singkat', message: 'Tulis minimal 15 karakter agar ahli bisa memahami kondisinya.' });
     }
 
+    const childId = req.body.childId || null;
+    if (childId && !(await ownsChild(parentId, childId))) {
+      return res.status(404).json({ error: 'not_found', message: 'Profil anak tidak ditemukan.' });
+    }
+
     const newQuestion: Question = {
       id: uid('q_'),
       parentId,
-      childId: req.body.childId || null,
+      childId,
       questionText: questionText.slice(0, 1000),
       status: 'pending',
       isPublic: req.body.isPublic ?? true,
@@ -1373,76 +1681,63 @@ const PORT = Number(process.env.PORT) || 3000;
     };
     await saveQuestion(newQuestion);
 
-    // Trigger AI Answer Generation asynchronously on behalf of the expert clinic
-    setTimeout(async () => {
+    // Questions are answered by FlourishCare psychologists and therapists from the expert view.
+    // Optional (QA_AUTO_ANSWER=true): an instant AI reply, clearly labelled as AI, never signed with a person's name.
+    if (QA_AUTO_ANSWER) {
       try {
-        let expertAnswer = '';
-        if (ai) {
-          const prompt = `Anda adalah tim expert FlourishCare, sebuah klinik tumbuh kembang anak terkemuka di Indonesia yang diisi oleh psikolog klinis anak dan terapis profesional (Okupasi, Wicara, Sensori Integrasi). 
-Pertanyaan dari Orang Tua (Ibu/Ayah): "${newQuestion.questionText}"
-
-Tugas Anda adalah menulis jawaban yang:
-1. SANGAT ramah, empatik, hangat, menenangkan namun profesional secara medis.
-2. Berikan analisis awal berbasis keilmuan tumbuh kembang (psikologi anak/pediatrik) namun ingatkan bahwa ini adalah deteksi dini, BUKAN diagnosis medis final.
-3. Sebutkan domain perkembangan yang terpengaruh (misal: sensori integrasi, bahasa, motorik kasar).
-4. Berikan 2-3 tips stimulasi praktis yang bisa dilakukan orang tua di rumah secara mandiri.
-5. Arahkan dengan lembut di bagian akhir untuk melakukan booking konsultasi dengan psikolog atau terapis okupasi/wicara FlourishCare untuk pemeriksaan diagnostik komprehensif.
-
-Gunakan bahasa Indonesia yang santun, runtut, dan terstruktur rapi dengan paragraf-paragraf yang enak dibaca.
-Jangan gunakan tanda em dash atau tanda pisah panjang. Gunakan koma atau titik sebagai gantinya.`;
-
-          const response = await ai.models.generateContent({
-            model: 'gemini-3.5-flash',
-            contents: prompt,
-            config: {
-              systemInstruction: 'Anda adalah Ira Amanda, M.Psi., Psikolog Klinis Anak Senior di Klinik FlourishCare. Berikan jawaban konsultasi tumbuh kembang anak yang kredibel, menyejukkan hati orang tua, informatif, dan mengarahkan untuk deteksi dini yang tepat.',
-              temperature: 0.7
-            }
-          });
-
-          expertAnswer = stripEmDash(response.text || '');
-        }
-
-        // Fallback if AI fails or key is missing
-        if (!expertAnswer) {
-          expertAnswer = `Halo Bapak/Ibu. Terima kasih atas pertanyaan yang dikirimkan. Keluhan ini menunjukkan adanya kebutuhan stimulasi yang terarah pada domain yang dikhawatirkan. Di rumah, Anda dapat meluangkan waktu 15-30 menit per hari tanpa gawai untuk mengajak anak berbicara tatap muka secara ekspresif atau melatih sensorinya dengan Sensory Play sederhana. Kami sangat menyarankan agar Bapak/Ibu segera menjadwalkan konsultasi evaluasi tumbuh kembang tatap muka dengan psikolog anak atau terapis kami di Klinik FlourishCare untuk diagnosis yang komprehensif dan terapi penunjang yang tepat.`;
-        }
-
-        // Update question in database
-        const qList = await getQuestions();
-        const qIndex = qList.findIndex(q => q.id === newQuestion.id);
-        if (qIndex !== -1) {
-          const updatedQ = {
-            ...qList[qIndex],
-            status: 'answered' as const,
-            answerText: expertAnswer,
-            answeredBy: 'Ira Amanda, M.Psi., Psikolog',
-            answeredAt: new Date().toISOString()
-          };
-          await saveQuestion(updatedQ);
-
-          // Add in-app notification
-          const newNotif: Notification = {
-            id: uid('n_'),
-            parentId: parentId,
-            type: 'q_and_a',
-            title: 'Tanya Ahli terjawab',
-            body: `Pertanyaan Anda soal tumbuh kembang si Kecil sudah dijawab oleh Ira Amanda, M.Psi., Psikolog.`,
-            deepLink: 'experts',
-            read: false,
-            createdAt: new Date().toISOString()
-          };
-          await addNotification(newNotif);
-        }
+        const draft = await draftExpertAnswer(newQuestion.questionText);
+        const answered: Question = {
+          ...newQuestion,
+          status: 'answered',
+          answerText: draft,
+          answeredBy: 'Asisten FlourishCare (AI)',
+          answeredAt: new Date().toISOString()
+        };
+        await saveQuestion(answered);
+        await addNotification({
+          id: uid('n_'),
+          parentId,
+          type: 'q_and_a',
+          title: 'Jawaban awal tersedia',
+          body: 'Asisten FlourishCare sudah memberi jawaban awal. Psikolog dan terapis kami tetap siap membantu lewat konsultasi.',
+          deepLink: 'experts',
+          read: false,
+          createdAt: new Date().toISOString()
+        });
+        return res.status(201).json(answered);
       } catch (err) {
-        console.error('Failed to generate expert response with Gemini:', err);
+        console.error('Auto answer failed, question stays pending:', err);
       }
-    }, 4000); // 4 seconds delay to simulate real expert reviewing
+    }
 
     res.status(201).json(newQuestion);
   });
 
+  /** AI draft used by staff (or the optional auto reply). Never signed with a person's name. */
+  async function draftExpertAnswer(questionText: string): Promise<string> {
+    let draftText = '';
+    if (ai) {
+      const prompt = `Anda membantu tim psikolog anak dan terapis FlourishCare (${CLINIC_LOCATION}) menyusun draf jawaban untuk orang tua.
+Pertanyaan orang tua: "${questionText}"
+
+Tulis jawaban yang hangat, empatik, dan berbasis ilmu tumbuh kembang anak. Jelaskan bahwa ini bukan diagnosis, sebutkan domain perkembangan yang relevan, beri 2 sampai 3 tips stimulasi yang bisa dilakukan di rumah, lalu sarankan konsultasi dengan psikolog atau terapis FlourishCare bila keluhan berlanjut.
+Gunakan bahasa Indonesia yang santun dan paragraf yang rapi. Jangan menyebut nama orang dan jangan gunakan tanda em dash atau tanda pisah panjang.`;
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.5-flash',
+        contents: prompt,
+        config: { temperature: 0.6 }
+      });
+      draftText = stripEmDash(response.text || '');
+    }
+    if (!draftText) {
+      draftText = 'Halo Ayah dan Bunda, terima kasih sudah bercerita. Setiap anak berkembang dengan ritmenya sendiri, namun kekhawatiran ini layak diperhatikan. Di rumah, luangkan 15 sampai 30 menit setiap hari tanpa gawai untuk bermain dan mengobrol tatap muka, ikuti minat si Kecil, dan beri jeda agar ia sempat merespons. Catat perubahan yang Ayah dan Bunda lihat selama dua minggu. Bila kekhawatiran berlanjut, psikolog dan terapis FlourishCare siap membantu melalui asesmen langsung.';
+    }
+    return draftText;
+  }
+
   app.post('/api/questions/answer-ai', async (req: Request, res: Response) => {
+    const staff = await getStaffInfo(getAuthUser(req));
+    if (!staff.isStaff) return res.status(403).json({ error: 'forbidden', message: 'Fitur ini khusus untuk tim ahli FlourishCare.' });
     const { questionId } = req.body;
     const qList = await getQuestions();
     const q = qList.find(item => item.id === questionId);
@@ -1451,29 +1746,7 @@ Jangan gunakan tanda em dash atau tanda pisah panjang. Gunakan koma atau titik s
     }
 
     try {
-      let draftText = '';
-      if (ai) {
-        const prompt = `Anda adalah asisten AI dari Ira Amanda, M.Psi., Psikolog Anak di Klinik FlourishCare.
-Tuliskan draf jawaban klinis untuk pertanyaan orang tua berikut:
-"${q.questionText}"
-
-Draf jawaban harus sangat hangat, empatik, kredibel secara medis/psikologis, memuat 2 tips stimulasi mandiri di rumah, dan merekomendasikan konsultasi langsung ke terapis/psikolog di Klinik Tebet jika dibutuhkan.
-Jangan gunakan tanda em dash atau tanda pisah panjang.`;
-
-        const response = await ai.models.generateContent({
-          model: 'gemini-3.5-flash',
-          contents: prompt,
-          config: {
-            temperature: 0.6
-          }
-        });
-        draftText = stripEmDash(response.text || '');
-      }
-
-      if (!draftText) {
-        draftText = `Halo Bunda, terima kasih atas pertanyaannya. Menanggapi kondisi si Kecil, hal tersebut wajar namun perlu dilatih secara aktif. Di rumah, silakan lakukan stimulasi bicara tatap muka selama 15 menit tanpa screen-time, serta latih otot wicaranya dengan meniup balon atau sedotan. Bila keluhan berlanjut dalam 2 minggu, kami sarankan konsultasi tatap muka bersama Psikolog Anak atau Terapis Wicara kami di Klinik FlourishCare Tebet.`;
-      }
-
+      const draftText = await draftExpertAnswer(q.questionText);
       res.json({ draftText });
     } catch (err: any) {
       res.status(500).json({ error: 'Failed to draft AI response', details: err.message });
@@ -1482,17 +1755,19 @@ Jangan gunakan tanda em dash atau tanda pisah panjang.`;
 
   app.post('/api/questions/:id/answer', async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { expertId, answerText } = req.body;
-    const userId = getUserId(req);
-    const activeProf = await getProfile(userId);
+    const { answerText } = req.body;
+    const staff = await getStaffInfo(getAuthUser(req));
+    if (!staff.isStaff) return res.status(403).json({ error: 'forbidden', message: 'Fitur ini khusus untuk tim ahli FlourishCare.' });
+    const cleanAnswer = stripEmDash(String(answerText || '')).trim();
+    if (cleanAnswer.length < 10) return res.status(400).json({ error: 'too_short', message: 'Jawaban terlalu singkat.' });
     const qList = await getQuestions();
     const index = qList.findIndex(q => q.id === id);
     if (index !== -1) {
       const updatedQ = {
         ...qList[index],
         status: 'answered' as const,
-        answerText: stripEmDash(String(answerText || '')),
-        answeredBy: expertId === 'exp_ira' ? 'Ira Amanda, M.Psi., Psikolog' : 'Rian Hidayat, A.Md.OT',
+        answerText: cleanAnswer,
+        answeredBy: staff.name || TEAM_SIGNATURE,
         answeredAt: new Date().toISOString()
       };
       await saveQuestion(updatedQ);
@@ -1500,10 +1775,10 @@ Jangan gunakan tanda em dash atau tanda pisah panjang.`;
       // Notify
       const newNotif: Notification = {
         id: uid('n_'),
-        parentId: updatedQ.parentId || activeProf.id,
+        parentId: updatedQ.parentId,
         type: 'q_and_a',
         title: 'Tanya Ahli terjawab',
-        body: `Pertanyaan Anda sudah dijawab langsung oleh psikolog anak kami.`,
+        body: `Pertanyaan Anda sudah dijawab oleh ${updatedQ.answeredBy}.`,
         deepLink: 'experts',
         read: false,
         createdAt: new Date().toISOString()
@@ -1534,6 +1809,7 @@ Jangan gunakan tanda em dash atau tanda pisah panjang.`;
     if (!body.childId || !body.scheduledAt) {
       return res.status(400).json({ error: 'Data booking belum lengkap.' });
     }
+    if (!(await guardChild(req, res, body.childId))) return;
     if (category === 'home_visit' && !String(body.address || '').trim()) {
       return res.status(400).json({ error: 'Alamat wajib diisi untuk home visit.' });
     }
@@ -1671,6 +1947,8 @@ Jangan gunakan tanda em dash atau tanda pisah panjang.`;
     // The bundled build (dist/server.cjs) always serves the compiled app, even without NODE_ENV set
     const isProduction = process.env.NODE_ENV === 'production' || (process.argv[1] || '').endsWith('server.cjs');
     if (!isProduction) {
+      // Loaded only in development so serverless builds never pull in Vite
+      const { createServer: createViteServer } = await import('vite');
       const vite = await createViteServer({
         server: { middlewareMode: true },
         appType: 'spa',

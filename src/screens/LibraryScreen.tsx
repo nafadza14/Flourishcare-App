@@ -4,10 +4,12 @@ import { BadgeCheck, Clock, Play, Search, X } from 'lucide-react';
 import Screen from '../components/ui/Screen';
 import CoverImage from '../components/ui/CoverImage';
 import { Card, Chip, EmptyState } from '../components/ui/primitives';
-import { PhotoAvatar } from '../components/ui/Avatar';
+import { PhotoAvatar, TeamAvatar } from '../components/ui/Avatar';
 import type { Article } from '../types';
 import { useNav } from '../lib/nav';
-import { ARTICLES_SEED, CLINICAL_EXPERTS } from '../data/seedData';
+import { ARTICLES_SEED } from '../data/seedData';
+import { findExpertByName, TEAM_SIGNATURE } from '../data/team';
+import { useExperts } from '../lib/experts';
 import { formatDate } from '../lib/format';
 import { listContainer, listItem } from '../lib/motion';
 
@@ -15,14 +17,14 @@ const UPCOMING_VIDEOS = [
   {
     id: 'v_1',
     title: 'Sensory play dengan beras kering untuk anak sensitif tekstur',
-    author: 'Rian Hidayat, A.Md.OT',
+    author: TEAM_SIGNATURE,
     minutes: 3,
     thumb: 'https://images.unsplash.com/photo-1596464716127-f2a82984de30?q=80&w=400&auto=format&fit=crop',
   },
   {
     id: 'v_2',
     title: 'Melatih kontak mata dan meniru kata pertama',
-    author: 'Ira Amanda, M.Psi., Psikolog',
+    author: TEAM_SIGNATURE,
     minutes: 5,
     thumb: 'https://images.unsplash.com/photo-1502086223501-7ea6ecd79368?q=80&w=400&auto=format&fit=crop',
   },
@@ -38,8 +40,11 @@ function plainExcerpt(html: string, length = 110) {
   return text.length > length ? text.slice(0, length).trim() + '...' : text;
 }
 
-function expertPhoto(name: string) {
-  return CLINICAL_EXPERTS.find((e) => name.startsWith(e.name.split(',')[0]))?.photoUrl;
+/** Photo when a team member wrote it, the clinic mark when it is signed by the team. */
+function AuthorAvatar({ name, size }: { name: string; size: number }) {
+  const experts = useExperts();
+  const expert = findExpertByName(experts, name);
+  return expert ? <PhotoAvatar src={expert.photoUrl} name={expert.name} size={size} /> : <TeamAvatar size={size} />;
 }
 
 export default function LibraryScreen({ onBack }: { onBack?: () => void }) {
@@ -103,7 +108,7 @@ export default function LibraryScreen({ onBack }: { onBack?: () => void }) {
                 <div className="text-[20px] leading-snug tracking-[-0.01em]">{featured.title}</div>
                 <p className="text-[15px] text-mute leading-relaxed mt-1.5">{plainExcerpt(featured.body)}</p>
                 <div className="flex items-center gap-2.5 mt-3.5">
-                  <PhotoAvatar src={expertPhoto(featured.authorName)} name={featured.authorName} size={30} />
+                  <AuthorAvatar name={featured.authorName} size={30} />
                   <span className="text-[14px] text-ink-2 flex-1 truncate">{featured.authorName}</span>
                   <span className="text-[13px] text-mute flex items-center gap-1 shrink-0">
                     <Clock className="w-3.5 h-3.5" /> {readMinutes(featured)} mnt
@@ -186,7 +191,7 @@ export function ArticleScreen({ id, onBack }: { id: string; onBack?: () => void 
         <span className="inline-flex h-7 px-3 rounded-full bg-brand-orange-soft text-brand-orange-deep text-[13px] items-center">{article.category}</span>
         <h1 className="text-[28px] leading-[1.18] tracking-[-0.02em] font-normal mt-3">{article.title}</h1>
         <div className="flex items-center gap-3 mt-4">
-          <PhotoAvatar src={expertPhoto(article.authorName)} name={article.authorName} size={42} />
+          <AuthorAvatar name={article.authorName} size={42} />
           <div className="min-w-0 flex-1">
             <div className="text-[16px] truncate">{article.authorName}</div>
             <div className="text-[14px] text-mute truncate">{article.authorCredential}</div>

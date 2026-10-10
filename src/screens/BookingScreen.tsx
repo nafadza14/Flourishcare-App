@@ -42,7 +42,7 @@ import {
   type PackageSize,
   type ServiceCategory,
 } from '../data/pricing';
-import { CLINICAL_EXPERTS } from '../data/seedData';
+import { useExperts } from '../lib/experts';
 import { ageLabel, firstName, formatDate, rupiah, toISODate } from '../lib/format';
 import { sendJSON } from '../api';
 import { emitDataChanged } from '../lib/events';
@@ -100,8 +100,9 @@ export default function BookingScreen({
   const [atHome, setAtHome] = useState(false);
   const [packageSize, setPackageSize] = useState<PackageSize>(8);
   const [weekend, setWeekend] = useState(false);
+  const experts = useExperts();
   const [therapistId, setTherapistId] = useState<string>(
-    () => initialTherapistId ?? (initialSubCode ? CLINICAL_EXPERTS.find((e) => e.services.includes(initialSubCode))?.id ?? '' : ''),
+    () => initialTherapistId ?? (initialSubCode ? experts.find((e) => e.services.includes(initialSubCode))?.id ?? '' : ''),
   );
   const [date, setDate] = useState<string>('');
   const [time, setTime] = useState<string>('');
@@ -125,8 +126,11 @@ export default function BookingScreen({
   const isHomeVisit = category === 'home_visit' || (!therapy && atHome);
 
   const subServices = subServicesFor(category);
-  const therapists = useMemo(() => CLINICAL_EXPERTS.filter((e) => !subCode || e.services.includes(subCode)), [subCode]);
-  const therapist = CLINICAL_EXPERTS.find((e) => e.id === therapistId);
+  const therapists = useMemo(() => {
+    const fit = experts.filter((e) => !subCode || e.services.includes(subCode));
+    return fit.length ? fit : experts;
+  }, [experts, subCode]);
+  const therapist = experts.find((e) => e.id === therapistId);
 
   const total = subCode ? calculatePrice({ category, subCode, packageSessions: packageSize, weekend, atHome }) : 0;
   const due = payDp ? Math.round(total / 2) : total;
@@ -408,7 +412,7 @@ export default function BookingScreen({
                       selected={subCode === s.code}
                       onSelect={() => {
                         setSubCode(s.code);
-                        const fit = CLINICAL_EXPERTS.filter((e) => e.services.includes(s.code));
+                        const fit = experts.filter((e) => e.services.includes(s.code));
                         if (!fit.some((e) => e.id === therapistId)) setTherapistId(fit[0]?.id ?? '');
                         setTime('');
                       }}
@@ -517,12 +521,7 @@ export default function BookingScreen({
                         <span className="flex-1 min-w-0">
                           <span className="block text-[16px] truncate">{e.name}</span>
                           <span className="block text-[14px] text-mute truncate">{e.role}</span>
-                          <span className="flex items-center gap-2 text-[13px] text-ink-2 mt-0.5">
-                            <span className="flex items-center gap-0.5">
-                              <Star className="w-3.5 h-3.5 text-brand-yellow" fill="currentColor" /> {e.rating}
-                            </span>
-                            <span>{e.years} tahun pengalaman</span>
-                          </span>
+                          <span className="block text-[13px] text-ink-2 mt-0.5 truncate">{e.specialties.slice(0, 3).join(' · ')}</span>
                         </span>
                         {therapistId === e.id && (
                           <span className="w-6 h-6 rounded-full bg-brand-orange text-white flex items-center justify-center">
