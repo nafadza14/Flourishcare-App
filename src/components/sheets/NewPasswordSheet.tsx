@@ -46,7 +46,7 @@ export default function NewPasswordSheet({ open, onClose }: { open: boolean; onC
       open={open}
       onClose={onClose}
       title="Buat kata sandi baru"
-      subtitle="Anda masuk lewat tautan dari email. Atur kata sandi baru untuk akun ini."
+      subtitle="Ayah Bunda masuk lewat tautan dari email. Buat kata sandi baru untuk akun ini."
       footer={
         <Button block size="lg" loading={saving} onClick={save}>
           Simpan kata sandi

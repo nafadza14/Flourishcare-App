@@ -85,14 +85,14 @@ function FeatureCard({ feature, onOpen }: { feature: Feature; onOpen: () => void
 }
 
 const GUEST_FEATURES: Feature[] = [
-  { key: 'vaccine', title: 'Jadwal Imunisasi', status: 'Pengingat sesuai IDAI', icon: Syringe, route: { name: 'vaccine' }, hero: true },
-  { key: 'growth', title: 'Pertumbuhan', status: 'Kurva WHO otomatis', icon: ChartColumn, route: { name: 'growth' } },
-  { key: 'milestone', title: 'Milestone', status: 'Ceklis per usia', icon: Footprints, route: { name: 'milestone' } },
-  { key: 'screening', title: 'Skrining Dini', status: 'KPSP dan M-CHAT-R', icon: ClipboardCheck, route: { name: 'screening' } },
-  { key: 'stimulasi', title: 'Stimulasi', status: 'Misi bermain harian', icon: Puzzle, route: { name: 'stimulasi' } },
-  { key: 'qa', title: 'Tanya Ahli', status: 'Dijawab dalam 24 jam', icon: MessageCircleHeart, route: { name: 'qa' } },
-  { key: 'library', title: 'Edukasi', status: 'Artikel dari para ahli', icon: BookOpen, route: { name: 'library' } },
-  { key: 'booking', title: 'Booking Klinik', status: 'Terapi dan konsultasi', icon: CalendarCheck, route: { name: 'booking' } },
+  { key: 'vaccine', title: 'Jadwal Imunisasi', status: 'Sesuai jadwal IDAI', icon: Syringe, route: { name: 'vaccine' }, hero: true },
+  { key: 'growth', title: 'Pertumbuhan', status: 'Grafik standar WHO', icon: ChartColumn, route: { name: 'growth' } },
+  { key: 'milestone', title: 'Milestone', status: 'Ceklis sesuai usia', icon: Footprints, route: { name: 'milestone' } },
+  { key: 'screening', title: 'Skrining Dini', status: 'KPSP & M-CHAT-R', icon: ClipboardCheck, route: { name: 'screening' } },
+  { key: 'stimulasi', title: 'Stimulasi', status: 'Ide main tiap hari', icon: Puzzle, route: { name: 'stimulasi' } },
+  { key: 'qa', title: 'Tanya Ahli', status: 'Dijawab psikolog & terapis', icon: MessageCircleHeart, route: { name: 'qa' } },
+  { key: 'library', title: 'Edukasi', status: 'Bacaan dari tim ahli', icon: BookOpen, route: { name: 'library' } },
+  { key: 'booking', title: 'Booking Klinik', status: 'Terapi & konsultasi', icon: CalendarCheck, route: { name: 'booking' } },
 ];
 
 /** Real FlourishCare team (www.flourishcare.id/team), tap for profile. */
@@ -104,7 +104,7 @@ function TeamSection() {
     <div className="mt-7">
       <div className="px-5 mb-3">
         <h2 className="text-[22px] font-normal leading-tight">Tim ahli kami</h2>
-        <p className="text-[15px] text-mute mt-0.5">Psikolog dan terapis anak FlourishCare</p>
+        <p className="text-[15px] text-mute mt-0.5">Psikolog dan terapis anak bersertifikat STR</p>
       </div>
       <motion.div className="flex gap-3 overflow-x-auto no-scrollbar px-5 pb-1" variants={listContainer} initial="hidden" animate="show">
         {experts.map((e) => (
@@ -192,7 +192,7 @@ function GuestHome() {
           <FlourishCareLogo className="w-11 h-11" animated />
           <div>
             <div className="text-[19px] leading-tight">FlourishCare</div>
-            <div className="text-[13px] text-mute">Rumah tumbuh kembang</div>
+            <div className="text-[13px] text-mute">Aplikasi tumbuh kembang anak</div>
           </div>
         </div>
         <Button size="sm" variant="secondary" onClick={() => nav.push({ name: 'auth', mode: 'login' })}>
@@ -201,9 +201,9 @@ function GuestHome() {
       </div>
 
       <h1 className="px-5 mt-7 text-[32px] leading-[1.12] tracking-[-0.025em] font-normal">
-        Rumah tumbuh kembang di genggaman <span className="anim-wiggle">🌱</span>
+        Setiap anak berhak tumbuh sepenuhnya <span className="anim-wiggle">🌱</span>
       </h1>
-      <p className="px-5 mt-2 text-[17px] text-mute leading-snug">Pantau, pahami, dan dampingi si Kecil bersama psikolog dan terapis FlourishCare.</p>
+      <p className="px-5 mt-2 text-[17px] text-mute leading-snug">Pantau pertumbuhan, milestone, dan imunisasi si Kecil dalam satu aplikasi, didampingi psikolog dan terapis anak FlourishCare.</p>
 
       <div className="mx-5 mt-6 rounded-[28px] bg-orange-gradient text-white p-5 shadow-orange relative overflow-hidden">
         <span className="absolute -right-10 -top-12 w-44 h-44 rounded-full bg-white/10" aria-hidden />
@@ -211,8 +211,8 @@ function GuestHome() {
           <KidAvatar size={96} bg={false} />
         </div>
         <div className="relative max-w-[62%]">
-          <div className="text-[14px] text-white/85">Gratis untuk orang tua</div>
-          <div className="text-[22px] leading-tight mt-1">Mulai catat perjalanan si Kecil hari ini</div>
+          <div className="text-[14px] text-white/85">Gratis untuk Ayah Bunda</div>
+          <div className="text-[22px] leading-tight mt-1">Yuk, mulai pantau tumbuh kembang si Kecil</div>
           <Button
             size="sm"
             variant="secondary"
@@ -227,7 +227,7 @@ function GuestHome() {
       <div className="mt-7 bg-white rounded-t-[32px] pt-6 hairline-t min-h-[60%]" style={{ paddingBottom: 'calc(var(--sab) + 112px)' }}>
         <div className="px-5 mb-4">
           <h2 className="text-[22px] font-normal leading-tight">Fitur</h2>
-          <p className="text-[15px] text-mute mt-0.5">Setiap langkah kecil itu berarti</p>
+          <p className="text-[15px] text-mute mt-0.5">Lengkap untuk tumbuh kembang si Kecil</p>
         </div>
         <motion.div className="grid grid-cols-2 gap-3 px-5" variants={listContainer} initial="hidden" animate="show">
           {GUEST_FEATURES.map((f) => (
@@ -289,7 +289,7 @@ export default function HomeScreen() {
   if (growthStatus.level === 'empty') {
     headline = (
       <>
-        Yuk mulai pantau tumbuh kembang {first} <span className="anim-wiggle">🌱</span>
+        Yuk, mulai pantau tumbuh kembang {first} <span className="anim-wiggle">🌱</span>
       </>
     );
   } else if (growthStatus.tone === 'success') {
@@ -307,7 +307,7 @@ export default function HomeScreen() {
   } else {
     headline = (
       <>
-        Yuk pantau berat badan {first} minggu ini <span className="anim-wiggle">🌱</span>
+        Yuk, cek berat badan {first} minggu ini <span className="anim-wiggle">🌱</span>
       </>
     );
   }
@@ -373,7 +373,7 @@ export default function HomeScreen() {
     {
       key: 'booking',
       title: 'Booking Klinik',
-      status: upcoming ? `Jadwal ${formatDate(upcoming.scheduledAt)}` : 'Terapi dan konsultasi',
+      status: upcoming ? `Jadwal ${formatDate(upcoming.scheduledAt)}` : 'Terapi & konsultasi',
       icon: CalendarCheck,
       route: upcoming ? { name: 'bookings' } : { name: 'booking' },
     },

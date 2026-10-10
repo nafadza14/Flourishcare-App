@@ -170,7 +170,7 @@ export default function AccountScreen() {
         <ListRow icon={MessageCircleHeart} title="Tanya ahli" onClick={() => nav.push({ name: 'qa' })} />
       </ListGroup>
 
-      <ListGroup title="Pengaturan notifikasi" className="mt-7" footer="Pengingat dikirim sesuai pilihan Anda. Jadwal booking tetap dikirim lewat WhatsApp.">
+      <ListGroup title="Pengaturan notifikasi" className="mt-7" footer="Pengingat dikirim sesuai pilihan Ayah Bunda.">
         {PREF_ROWS.map((row) => (
           <ListRow
             key={row.key}
@@ -201,7 +201,7 @@ export default function AccountScreen() {
 
       <EditProfileSheet open={editOpen} onClose={() => setEditOpen(false)} profile={profile} />
       <AboutSheet open={aboutOpen} onClose={() => setAboutOpen(false)} showAdmin={!!profile?.isStaff} />
-      <Sheet open={logoutOpen} onClose={() => setLogoutOpen(false)} title="Keluar dari akun?" subtitle="Data Anda tetap tersimpan dan bisa diakses lagi saat masuk.">
+      <Sheet open={logoutOpen} onClose={() => setLogoutOpen(false)} title="Keluar dari akun?" subtitle="Data si Kecil tetap tersimpan dan muncul lagi saat Ayah Bunda masuk kembali.">
         <div className="grid grid-cols-2 gap-2.5 pt-2">
           <Button variant="secondary" onClick={() => setLogoutOpen(false)}>
             Batal

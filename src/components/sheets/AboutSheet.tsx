@@ -49,10 +49,10 @@ export default function AboutSheet({ open, onClose, showAdmin = false }: { open:
             <FlourishCareLogo className="w-20 h-20" animated />
           </motion.div>
           <div className="text-[22px] mt-2">FlourishCare</div>
-          <div className="text-[14px] text-mute">Rumah tumbuh kembang di genggaman · versi {APP_VERSION}</div>
+          <div className="text-[14px] text-mute">Aplikasi tumbuh kembang anak · versi {APP_VERSION}</div>
         </div>
         <p className="text-[16px] text-ink-2 leading-relaxed">
-          FlourishCare membantu orang tua memantau pertumbuhan, milestone, imunisasi, dan skrining dini si Kecil. Bila butuh bantuan lebih, psikolog dan terapis klinik FlourishCare siap mendampingi, baik di klinik maupun di rumah.
+          FlourishCare membantu Ayah Bunda memantau pertumbuhan, milestone, imunisasi, dan skrining dini si Kecil. Saat butuh bantuan lebih, psikolog dan terapis FlourishCare di Klinik Mitra Diani, Jakarta Timur, siap mendampingi.
         </p>
 
         {showAdmin && (
@@ -101,7 +101,7 @@ export default function AboutSheet({ open, onClose, showAdmin = false }: { open:
           </AnimatePresence>
         </div>
         )}
-        <p className="text-[13px] text-mute text-center leading-relaxed">Mitra resmi layanan tumbuh kembang klinik FlourishCare. Konten bersifat edukatif dan bukan pengganti pemeriksaan langsung.</p>
+        <p className="text-[13px] text-mute text-center leading-relaxed">Aplikasi resmi klinik FlourishCare. Konten bersifat edukatif dan bukan pengganti pemeriksaan langsung.</p>
       </div>
     </Sheet>
   );

@@ -81,7 +81,7 @@ export default function BookingsScreen({ onBack }: { onBack?: () => void }) {
       emitDataChanged('bookings');
       setConfirmCancel(false);
       setSelected(null);
-      toast({ title: 'Booking dibatalkan', body: 'Tim kami akan menghubungi Anda untuk proses selanjutnya.', tone: 'info' });
+      toast({ title: 'Booking dibatalkan', body: 'Tim kami akan menghubungi Ayah Bunda untuk proses selanjutnya.', tone: 'info' });
     } catch (err: any) {
       toast({ title: 'Gagal membatalkan', body: err.message, tone: 'warning' });
     } finally {

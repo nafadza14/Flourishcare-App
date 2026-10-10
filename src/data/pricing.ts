@@ -16,7 +16,7 @@ export interface SubService {
 
 export const SERVICE_CATEGORIES: { key: ServiceCategory; title: string; description: string }[] = [
   { key: 'onsite', title: 'Terapi di klinik', description: 'Sesi terapi di rumah tumbuh kembang FlourishCare.' },
-  { key: 'home_visit', title: 'Terapi home visit', description: 'Terapis datang ke rumah Anda, radius hingga 10 km.' },
+  { key: 'home_visit', title: 'Terapi home visit', description: 'Terapis datang ke rumah, radius hingga 10 km.' },
   { key: 'psikolog', title: 'Konsultasi psikolog', description: 'Sesi bersama psikolog anak berpengalaman.' },
   { key: 'psikotes', title: 'Psikotes', description: 'Tes IQ, kesiapan sekolah, dan penegakan diagnosa.' },
 ];

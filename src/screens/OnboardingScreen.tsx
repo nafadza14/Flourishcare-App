@@ -9,7 +9,7 @@ import { KidAvatar, ParentAvatar } from '../components/ui/Avatar';
 import FlourishCareLogo from '../components/FlourishCareLogo';
 import { useToast } from '../components/ui/Toast';
 import type { Child } from '../types';
-import { useStore, saveLocalChild } from '../lib/store';
+import { useStore } from '../lib/store';
 import { apiFetch } from '../api';
 import { emitDataChanged } from '../lib/events';
 import { firstName, todayISO } from '../lib/format';
@@ -76,13 +76,15 @@ export default function OnboardingScreen({ firstRun, onDone, onCancel }: Props) 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      if (res.ok) child = await res.json();
-    } catch {
-      /* fall back to local storage below */
-    }
-    if (!child) {
-      child = { id: 'c_local_' + Date.now(), parentId: profile?.id ?? 'local', createdAt: new Date().toISOString(), ...payload };
-      saveLocalChild(child);
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.message || 'Profil belum tersimpan. Periksa koneksi lalu coba lagi.');
+      child = data as Child;
+    } catch (err: any) {
+      // Never keep the child only on this device: it would vanish on the next login
+      haptic('warning');
+      setError(err?.message || 'Profil belum tersimpan. Periksa koneksi lalu coba lagi.');
+      setSaving(false);
+      return;
     }
     await refreshChildren(child.id);
     emitDataChanged('children');

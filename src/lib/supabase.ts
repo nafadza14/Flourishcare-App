@@ -209,7 +209,7 @@ export async function consumeAuthRedirect(): Promise<AuthReturn> {
     return { kind: 'session', flow };
   } catch (err: any) {
     if (flow === 'confirm') {
-      return { kind: 'error', flow, message: 'Email sudah terverifikasi. Silakan masuk dengan email dan kata sandi Anda.' };
+      return { kind: 'error', flow, message: 'Email sudah terverifikasi. Silakan masuk dengan email dan kata sandi yang tadi dibuat.' };
     }
     return { kind: 'error', flow, message: authErrorMessage(err) };
   }
@@ -231,6 +231,6 @@ export function authErrorMessage(err: { message?: string; status?: number; code?
   if (raw.includes('access_denied') || raw.includes('denied')) return 'Masuk dengan Google dibatalkan.';
   if (raw.includes('code verifier') || raw.includes('flow_state') || raw.includes('pkce')) return 'Sesi masuk kedaluwarsa. Silakan coba masuk lagi dari perangkat yang sama.';
   if (raw.includes('same_password') || raw.includes('should be different')) return 'Kata sandi baru harus berbeda dari yang lama.';
-  if (raw.includes('fetch') || raw.includes('network')) return 'Tidak dapat terhubung. Periksa koneksi internet Anda.';
+  if (raw.includes('fetch') || raw.includes('network')) return 'Tidak dapat terhubung. Periksa koneksi internet, lalu coba lagi.';
   return 'Gagal masuk. Coba lagi sebentar lagi.';
 }

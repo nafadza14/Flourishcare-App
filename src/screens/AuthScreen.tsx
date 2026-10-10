@@ -64,7 +64,7 @@ export default function AuthScreen({
     if (!emailValid()) e.email = 'Masukkan email yang valid.';
     if (mode === 'register') {
       if (password.length < 8) e.password = 'Kata sandi minimal 8 karakter.';
-      if (fullName.trim().length < 3) e.fullName = 'Isi nama lengkap Anda.';
+      if (fullName.trim().length < 3) e.fullName = 'Isi nama lengkap dulu, ya.';
       if (phone && !/^(\+62|62|0)8\d{7,12}$/.test(phone.replace(/[\s-]/g, ''))) e.phone = 'Contoh format: 081234567890.';
     } else if (!password) {
       e.password = 'Masukkan kata sandi.';
@@ -123,7 +123,7 @@ export default function AuthScreen({
 
   const forgot = async () => {
     if (!emailValid()) {
-      setErrors({ email: 'Isi email akun Anda dulu, lalu ketuk Lupa kata sandi.' });
+      setErrors({ email: 'Isi email akun dulu, lalu ketuk Lupa kata sandi.' });
       return;
     }
     setResetLoading(true);
@@ -150,7 +150,7 @@ export default function AuthScreen({
           >
             <MailCheck className="w-10 h-10" strokeWidth={1.6} />
           </motion.div>
-          <h1 className="text-[28px] leading-tight tracking-[-0.02em] font-normal mt-6">Cek email Anda</h1>
+          <h1 className="text-[28px] leading-tight tracking-[-0.02em] font-normal mt-6">Cek kotak masuk email</h1>
           <p className="text-[16px] text-mute mt-2 max-w-[310px] leading-relaxed">
             {sentTo.kind === 'confirm'
               ? 'Kami mengirim tautan verifikasi ke'
@@ -192,7 +192,7 @@ export default function AuthScreen({
           </div>
           <h1 className="text-[30px] leading-tight tracking-[-0.02em] font-normal mt-5">{mode === 'login' ? 'Selamat datang kembali' : 'Buat akun gratis'}</h1>
           <p className="text-[16px] text-mute mt-1.5 max-w-[300px]">
-            {mode === 'login' ? 'Lanjutkan perjalanan tumbuh kembang si Kecil.' : 'Pantau tumbuh kembang si Kecil bersama para ahli FlourishCare.'}
+            {mode === 'login' ? 'Lanjutkan memantau tumbuh kembang si Kecil.' : 'Pantau si Kecil bersama psikolog dan terapis anak FlourishCare.'}
           </p>
         </motion.div>
 
@@ -260,7 +260,7 @@ export default function AuthScreen({
                     ))}
                   </div>
                 </div>
-                <Field label="Nama lengkap" icon={User} value={fullName} onChange={(e) => setFullName(e.target.value)} error={errors.fullName} placeholder="Nama Anda" autoComplete="name" />
+                <Field label="Nama lengkap" icon={User} value={fullName} onChange={(e) => setFullName(e.target.value)} error={errors.fullName} placeholder="Nama lengkap" autoComplete="name" />
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="WhatsApp" icon={Phone} inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} error={errors.phone} placeholder="0812..." autoComplete="tel" />
                   <Field label="Kota" icon={MapPin} value={city} onChange={(e) => setCity(e.target.value)} placeholder="Jakarta" autoComplete="address-level2" />

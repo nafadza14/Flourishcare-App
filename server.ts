@@ -51,6 +51,16 @@ const DEMO_SEED = process.env.DEMO_SEED === 'true';
 const ALLOW_LEGACY_TOKENS = process.env.ALLOW_LEGACY_TOKENS === 'true';
 /** When true, questions get an instant AI reply labelled as such. Default: wait for a real expert. */
 const QA_AUTO_ANSWER = process.env.QA_AUTO_ANSWER === 'true';
+/**
+ * On Vercel every request can hit a fresh instance, so memory is not storage.
+ * In strict mode the API refuses to "save" into memory and answers 503 instead,
+ * which the app shows as an error rather than silently losing data.
+ */
+const STRICT_DB = !DEMO_SEED && (process.env.VERCEL === '1' || process.env.STRICT_DB === 'true');
+class DbUnavailableError extends Error {}
+function failIfStrict(err: any) {
+  if (STRICT_DB) throw new DbUnavailableError(err?.message || String(err));
+}
 
 /**
  * Circuit breaker around Supabase network calls. When the database host is
@@ -117,6 +127,20 @@ if (process.env.GEMINI_API_KEY) {
 
 const app = express();
 app.use(express.json({ limit: '3mb' }));
+
+// Express 4 does not catch rejected promises from async handlers: forward them to the error middleware
+for (const method of ['get', 'post', 'put', 'delete', 'patch'] as const) {
+  const original = (app as any)[method].bind(app);
+  (app as any)[method] = (path: any, ...handlers: any[]) => {
+    if (!handlers.length) return original(path);
+    return original(
+      path,
+      ...handlers.map((h) =>
+        typeof h === 'function' && h.length < 4 ? (req: any, res: any, next: any) => Promise.resolve(h(req, res, next)).catch(next) : h,
+      ),
+    );
+  };
+}
 
 const PORT = Number(process.env.PORT) || 3000;
 
@@ -535,6 +559,7 @@ const PORT = Number(process.env.PORT) || 3000;
         };
       }
     } catch (err: any) {
+      failIfStrict(err);
       if (isTableMissingError(err)) {
         console.log('Supabase table app_profiles is not setup yet, using local memory storage.');
       } else {
@@ -597,6 +622,7 @@ const PORT = Number(process.env.PORT) || 3000;
       });
       if (error) throw error;
     } catch (err: any) {
+      failIfStrict(err);
       console.warn('Supabase updateProfile failed, updated memory only:', err.message || err);
     }
     return existing;
@@ -606,7 +632,7 @@ const PORT = Number(process.env.PORT) || 3000;
     try {
       const { data, error } = await supabase.from('app_children').select('*').eq('parent_id', userId);
       if (error) throw error;
-      if (data && data.length > 0) {
+      if (data && (data.length > 0 || STRICT_DB)) {
         return data.map(item => ({
           id: item.id,
           parentId: item.parent_id,
@@ -621,6 +647,7 @@ const PORT = Number(process.env.PORT) || 3000;
         }));
       }
     } catch (err: any) {
+      failIfStrict(err);
       if (isTableMissingError(err)) {
         console.log('Supabase table app_children is not setup yet, using local memory storage.');
       } else {
@@ -652,6 +679,7 @@ const PORT = Number(process.env.PORT) || 3000;
       });
       if (dbError) throw dbError;
     } catch (err: any) {
+      failIfStrict(err);
       console.warn('Supabase saveChild failed, updated memory only:', err.message || err);
     }
   }
@@ -667,6 +695,7 @@ const PORT = Number(process.env.PORT) || 3000;
       const { error: dbError } = await supabase.from('app_children').delete().eq('id', childId);
       if (dbError) throw dbError;
     } catch (err: any) {
+      failIfStrict(err);
       console.warn('Supabase deleteChild failed, updated memory only:', err.message || err);
     }
   }
@@ -675,7 +704,7 @@ const PORT = Number(process.env.PORT) || 3000;
     try {
       const { data, error } = await supabase.from('app_growth_records').select('*').eq('child_id', childId);
       if (error) throw error;
-      if (data && data.length > 0) {
+      if (data && (data.length > 0 || STRICT_DB)) {
         return data.map(item => ({
           id: item.id,
           childId: item.child_id,
@@ -688,6 +717,7 @@ const PORT = Number(process.env.PORT) || 3000;
         })).sort((a,b) => a.date.localeCompare(b.date));
       }
     } catch (err: any) {
+      failIfStrict(err);
       if (isTableMissingError(err)) {
         console.log('Supabase table app_growth_records is not setup yet, using local memory storage.');
       } else {
@@ -712,6 +742,7 @@ const PORT = Number(process.env.PORT) || 3000;
       });
       if (dbError) throw dbError;
     } catch (err: any) {
+      failIfStrict(err);
       console.warn('Supabase saveGrowthRecord failed, updated memory only:', err.message || err);
     }
   }
@@ -722,6 +753,7 @@ const PORT = Number(process.env.PORT) || 3000;
       const { error: dbError } = await supabase.from('app_growth_records').delete().eq('id', id);
       if (dbError) throw dbError;
     } catch (err: any) {
+      failIfStrict(err);
       console.warn('Supabase deleteGrowthRecord failed, updated memory only:', err.message || err);
     }
   }
@@ -730,7 +762,7 @@ const PORT = Number(process.env.PORT) || 3000;
     try {
       const { data, error } = await supabase.from('app_child_milestones').select('*').eq('child_id', childId);
       if (error) throw error;
-      if (data && data.length > 0) {
+      if (data && (data.length > 0 || STRICT_DB)) {
         return data.map(item => ({
           id: item.id,
           childId: item.child_id,
@@ -741,6 +773,7 @@ const PORT = Number(process.env.PORT) || 3000;
         }));
       }
     } catch (err: any) {
+      failIfStrict(err);
       if (isTableMissingError(err)) {
         console.log('Supabase table app_child_milestones is not setup yet, using local memory storage.');
       } else {
@@ -768,6 +801,7 @@ const PORT = Number(process.env.PORT) || 3000;
       });
       if (dbError) throw dbError;
     } catch (err: any) {
+      failIfStrict(err);
       console.warn('Supabase saveChildMilestone failed, updated memory only:', err.message || err);
     }
   }
@@ -778,6 +812,7 @@ const PORT = Number(process.env.PORT) || 3000;
       const { error: dbError } = await supabase.from('app_child_milestones').delete().eq('child_id', childId).eq('milestone_id', milestoneId);
       if (dbError) throw dbError;
     } catch (err: any) {
+      failIfStrict(err);
       console.warn('Supabase deleteChildMilestone failed, updated memory only:', err.message || err);
     }
   }
@@ -786,7 +821,7 @@ const PORT = Number(process.env.PORT) || 3000;
     try {
       const { data, error } = await supabase.from('app_child_immunizations').select('*').eq('child_id', childId);
       if (error) throw error;
-      if (data && data.length > 0) {
+      if (data && (data.length > 0 || STRICT_DB)) {
         return data.map(item => ({
           id: item.id,
           childId: item.child_id,
@@ -797,6 +832,7 @@ const PORT = Number(process.env.PORT) || 3000;
         }));
       }
     } catch (err: any) {
+      failIfStrict(err);
       if (isTableMissingError(err)) {
         console.log('Supabase table app_child_immunizations is not setup yet, using local memory storage.');
       } else {
@@ -824,6 +860,7 @@ const PORT = Number(process.env.PORT) || 3000;
       });
       if (dbError) throw dbError;
     } catch (err: any) {
+      failIfStrict(err);
       console.warn('Supabase saveChildImmunization failed, updated memory only:', err.message || err);
     }
   }
@@ -834,6 +871,7 @@ const PORT = Number(process.env.PORT) || 3000;
       const { error: dbError } = await supabase.from('app_child_immunizations').delete().eq('child_id', childId).eq('immunization_id', immunizationId);
       if (dbError) throw dbError;
     } catch (err: any) {
+      failIfStrict(err);
       console.warn('Supabase deleteChildImmunization failed, updated memory only:', err.message || err);
     }
   }
@@ -842,7 +880,7 @@ const PORT = Number(process.env.PORT) || 3000;
     try {
       const { data, error } = await supabase.from('app_screenings').select('*').eq('child_id', childId);
       if (error) throw error;
-      if (data && data.length > 0) {
+      if (data && (data.length > 0 || STRICT_DB)) {
         return data.map(item => ({
           id: item.id,
           childId: item.child_id,
@@ -857,6 +895,7 @@ const PORT = Number(process.env.PORT) || 3000;
         })).sort((a,b) => b.createdAt.localeCompare(a.createdAt));
       }
     } catch (err: any) {
+      failIfStrict(err);
       if (isTableMissingError(err)) {
         console.log('Supabase table app_screenings is not setup yet, using local memory storage.');
       } else {
@@ -883,6 +922,7 @@ const PORT = Number(process.env.PORT) || 3000;
       });
       if (dbError) throw dbError;
     } catch (err: any) {
+      failIfStrict(err);
       console.warn('Supabase saveScreening failed, updated memory only:', err.message || err);
     }
   }
@@ -891,7 +931,7 @@ const PORT = Number(process.env.PORT) || 3000;
     try {
       const { data, error } = await supabase.from('app_questions').select('*');
       if (error) throw error;
-      if (data && data.length > 0) {
+      if (data && (data.length > 0 || STRICT_DB)) {
         return data.map(item => ({
           id: item.id,
           parentId: item.parent_id,
@@ -907,6 +947,7 @@ const PORT = Number(process.env.PORT) || 3000;
         })).sort((a,b) => b.createdAt.localeCompare(a.createdAt));
       }
     } catch (err: any) {
+      failIfStrict(err);
       if (isTableMissingError(err)) {
         console.log('Supabase table app_questions is not setup yet, using local memory storage.');
       } else {
@@ -939,6 +980,7 @@ const PORT = Number(process.env.PORT) || 3000;
       });
       if (dbError) throw dbError;
     } catch (err: any) {
+      failIfStrict(err);
       console.warn('Supabase saveQuestion failed, updated memory only:', err.message || err);
     }
   }
@@ -947,7 +989,7 @@ const PORT = Number(process.env.PORT) || 3000;
     try {
       const { data, error } = await supabase.from('app_bookings').select('*').eq('parent_id', userId);
       if (error) throw error;
-      if (data && data.length > 0) {
+      if (data && (data.length > 0 || STRICT_DB)) {
         return data.map(item => ({
           id: item.id,
           parentId: item.parent_id,
@@ -969,6 +1011,7 @@ const PORT = Number(process.env.PORT) || 3000;
         })).sort((a,b) => b.scheduledAt.localeCompare(a.scheduledAt));
       }
     } catch (err: any) {
+      failIfStrict(err);
       if (isTableMissingError(err)) {
         console.log('Supabase table app_bookings is not setup yet, using local memory storage.');
       } else {
@@ -1007,6 +1050,7 @@ const PORT = Number(process.env.PORT) || 3000;
       });
       if (dbError) throw dbError;
     } catch (err: any) {
+      failIfStrict(err);
       console.warn('Supabase saveBooking failed, updated memory only:', err.message || err);
     }
   }
@@ -1015,7 +1059,7 @@ const PORT = Number(process.env.PORT) || 3000;
     try {
       const { data, error } = await supabase.from('app_notifications').select('*').eq('parent_id', userId);
       if (error) throw error;
-      if (data && data.length > 0) {
+      if (data && (data.length > 0 || STRICT_DB)) {
         return data.map(item => ({
           id: item.id,
           parentId: item.parent_id,
@@ -1028,6 +1072,7 @@ const PORT = Number(process.env.PORT) || 3000;
         })).sort((a,b) => b.createdAt.localeCompare(a.createdAt));
       }
     } catch (err: any) {
+      failIfStrict(err);
       if (isTableMissingError(err)) {
         console.log('Supabase table app_notifications is not setup yet, using local memory storage.');
       } else {
@@ -1052,6 +1097,7 @@ const PORT = Number(process.env.PORT) || 3000;
       });
       if (dbError) throw dbError;
     } catch (err: any) {
+      failIfStrict(err);
       console.warn('Supabase addNotification failed, updated memory only:', err.message || err);
     }
   }
@@ -1066,6 +1112,7 @@ const PORT = Number(process.env.PORT) || 3000;
       const { error: dbError } = await supabase.from('app_notifications').update({ read: true }).eq('parent_id', userId);
       if (dbError) throw dbError;
     } catch (err: any) {
+      failIfStrict(err);
       console.warn('Supabase markAllNotificationsRead failed, updated memory only:', err.message || err);
     }
   }
@@ -1093,6 +1140,7 @@ const PORT = Number(process.env.PORT) || 3000;
         };
       }
     } catch (err: any) {
+      failIfStrict(err);
       if (isTableMissingError(err)) {
         console.log('Supabase table app_preferences is not setup yet, using local memory storage.');
       } else {
@@ -1138,6 +1186,7 @@ const PORT = Number(process.env.PORT) || 3000;
       });
       if (dbError) throw dbError;
     } catch (err: any) {
+      failIfStrict(err);
       console.warn('Supabase savePreferences failed, updated memory only:', err.message || err);
     }
     return existing;
@@ -1412,6 +1461,7 @@ const PORT = Number(process.env.PORT) || 3000;
       await saveChild(newChild);
       res.status(201).json(newChild);
     } catch (err: any) {
+      failIfStrict(err);
       console.error('Crash in POST /api/children:', err);
       const fallbackChild: Child = {
         id: uid('c_fallback_'),
@@ -1943,6 +1993,16 @@ Gunakan bahasa Indonesia yang santun dan paragraf yang rapi. Jangan menyebut nam
   // VITE DEVELOPMENT OR PRODUCTION MIDDLEWARE
   // ==========================================
   
+  // Errors from any route end here
+  app.use((err: any, _req: Request, res: Response, _next: any) => {
+    if (err instanceof DbUnavailableError) {
+      console.error('Database unavailable:', err.message);
+      return res.status(503).json({ error: 'db_unavailable', message: 'Data belum bisa disimpan karena database sedang tidak tersedia. Coba lagi sebentar lagi.' });
+    }
+    console.error('Unhandled API error:', err);
+    res.status(500).json({ error: 'server_error', message: 'Terjadi kendala di server. Coba lagi sebentar lagi.' });
+  });
+
   async function startLocalServer() {
     // The bundled build (dist/server.cjs) always serves the compiled app, even without NODE_ENV set
     const isProduction = process.env.NODE_ENV === 'production' || (process.argv[1] || '').endsWith('server.cjs');

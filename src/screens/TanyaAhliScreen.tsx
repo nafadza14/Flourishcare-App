@@ -152,7 +152,7 @@ function ComposeSheet({ open, onClose, remaining, childId, childName }: { open: 
     try {
       await sendJSON('/api/questions', { childId, questionText: text.trim(), category, isPublic });
       emitDataChanged('questions');
-      toast({ title: 'Pertanyaan terkirim', body: 'Ahli FlourishCare akan menjawab dalam 24 jam.' });
+      toast({ title: 'Pertanyaan terkirim', body: 'Kami kabari lewat notifikasi begitu psikolog atau terapis menjawab.' });
       setText('');
       onClose();
     } catch (err: any) {
@@ -292,7 +292,7 @@ export default function TanyaAhliScreen({ onBack }: { onBack?: () => void }) {
     // Toast when a pending question of mine just got answered
     list.forEach((q) => {
       if (pendingIds.current.has(q.id) && q.status !== 'pending') {
-        toast({ title: 'Pertanyaan Anda terjawab', body: `Dijawab oleh ${q.answeredBy ?? 'tim ahli'}.` });
+        toast({ title: 'Pertanyaan Ayah Bunda terjawab', body: `Dijawab oleh ${q.answeredBy ?? 'tim ahli'}.` });
         emitDataChanged('notifications');
       }
     });
@@ -426,7 +426,7 @@ export default function TanyaAhliScreen({ onBack }: { onBack?: () => void }) {
                 <EmptyState
                   icon={MessageCircleHeart}
                   title="Belum ada pertanyaan"
-                  body="Tanyakan apa pun soal tumbuh kembang si Kecil. Jawaban datang dalam 24 jam."
+                  body="Tanyakan apa pun soal tumbuh kembang si Kecil. Psikolog dan terapis FlourishCare yang akan menjawab."
                   action={
                     <Button icon={Plus} onClick={() => setComposeOpen(true)}>
                       Tulis pertanyaan

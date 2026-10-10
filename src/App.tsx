@@ -41,8 +41,42 @@ function Splash() {
       </motion.div>
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="mt-4 text-center">
         <div className="text-[24px] tracking-[-0.01em]">FlourishCare</div>
-        <div className="text-[15px] text-mute mt-1">Menyiapkan rumah tumbuh kembang</div>
+        <div className="text-[15px] text-mute mt-1">Setiap anak berhak tumbuh sepenuhnya</div>
       </motion.div>
+    </motion.div>
+  );
+}
+
+function LoadError() {
+  const { refreshChildren, logout } = useStore();
+  const [retrying, setRetrying] = useState(false);
+  return (
+    <motion.div
+      className="absolute inset-0 z-[65] flex flex-col items-center justify-center px-8 text-center bg-canvas-gradient"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <FlourishCareLogo className="w-20 h-20" animated />
+      <h1 className="text-[26px] leading-tight tracking-[-0.02em] font-normal mt-5">Data si Kecil belum bisa dimuat</h1>
+      <p className="text-[16px] text-mute mt-2 leading-relaxed max-w-[300px]">
+        Tenang, data Ayah Bunda tidak hilang. Server kami sedang tidak terjangkau, coba lagi beberapa saat lagi.
+      </p>
+      <button
+        type="button"
+        disabled={retrying}
+        onClick={async () => {
+          setRetrying(true);
+          await refreshChildren();
+          setRetrying(false);
+        }}
+        className="mt-7 h-[52px] px-8 rounded-full bg-orange-gradient text-white text-[17px] shadow-orange disabled:opacity-70"
+      >
+        {retrying ? 'Memuat...' : 'Coba lagi'}
+      </button>
+      <button type="button" onClick={() => logout()} className="mt-3 h-11 px-4 text-[15px] text-mute">
+        Keluar dari akun
+      </button>
     </motion.div>
   );
 }
@@ -139,7 +173,7 @@ function TabView({ tab }: { tab: TabKey }) {
 }
 
 function Shell() {
-  const { booting, isAuthed, children, activeChild, recoveryMode, setRecoveryMode, profile } = useStore();
+  const { booting, isAuthed, children, activeChild, recoveryMode, setRecoveryMode, profile, childrenStatus } = useStore();
   const nav = useNav();
   const [visited, setVisited] = useState<Set<TabKey>>(() => new Set(['home']));
 
@@ -160,7 +194,8 @@ function Shell() {
   }, [isAuthed]);
 
   // Clinic staff can use the app without adding a child
-  const needsOnboarding = !booting && isAuthed && children.length === 0 && !profile?.isStaff;
+  const needsOnboarding = !booting && isAuthed && childrenStatus === 'ok' && children.length === 0 && !profile?.isStaff;
+  const loadFailed = !booting && isAuthed && childrenStatus === 'error';
   const pushed = nav.stack.length > 0;
   const childScoped = isAuthed && !!activeChild;
 
@@ -217,6 +252,9 @@ function Shell() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Could not load the family data: never fall back to "add your first child" */}
+      <AnimatePresence>{loadFailed && <LoadError />}</AnimatePresence>
 
       <AnimatePresence>{booting && <Splash />}</AnimatePresence>
 

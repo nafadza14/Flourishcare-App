@@ -14,6 +14,8 @@ interface AppStore {
   activeChild: Child | null;
   setActiveChild: (id: string) => void;
   refreshChildren: (selectId?: string) => Promise<Child[]>;
+  /** 'error' when the child list could not be loaded (never treat that as "no children") */
+  childrenStatus: 'idle' | 'ok' | 'error';
   refreshProfile: () => Promise<void>;
   setProfile: (p: UserProfile) => void;
   /** Load the app profile for the current Supabase session (after any sign-in). */
@@ -70,12 +72,41 @@ export function StoreProvider({ children: content }: { children: React.ReactNode
   const profileRef = useRef<UserProfile | null>(null);
   profileRef.current = profile;
 
+  const [childrenStatus, setChildrenStatus] = useState<'idle' | 'ok' | 'error'>('idle');
+
   const refreshChildren = useCallback(async (selectId?: string) => {
-    const remote = await getJSON<Child[]>('/api/children', []);
+    let remote: Child[];
+    try {
+      const res = await apiFetch('/api/children');
+      if (!res.ok) throw new Error(`status ${res.status}`);
+      remote = (await res.json()) as Child[];
+    } catch {
+      setChildrenStatus('error');
+      return [];
+    }
+
+    // Older builds kept a child on this device when saving failed: move it to the account now
+    const pending = readLocalChildren();
+    if (pending.length) {
+      for (const lc of pending) {
+        try {
+          const res = await apiFetch('/api/children', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: lc.name, birthDate: lc.birthDate, gender: lc.gender, isPremature: lc.isPremature, medicalNotes: lc.medicalNotes }),
+          });
+          if (res.ok) {
+            remote.push((await res.json()) as Child);
+            removeLocalChild(lc.id);
+          }
+        } catch {
+          /* try again next time */
+        }
+      }
+    }
+
     const merged = [...remote];
-    readLocalChildren().forEach((lc) => {
-      if (!merged.some((c) => c.id === lc.id)) merged.push(lc);
-    });
+    setChildrenStatus('ok');
     setChildList(merged);
     setActiveId((current) => {
       const wanted = selectId ?? current;
@@ -104,6 +135,7 @@ export function StoreProvider({ children: content }: { children: React.ReactNode
 
   const resetState = useCallback(() => {
     localStorage.removeItem(ACTIVE_CHILD_KEY);
+    setChildrenStatus('idle');
     setProfile(null);
     setChildList([]);
     setActiveId(null);
@@ -128,8 +160,8 @@ export function StoreProvider({ children: content }: { children: React.ReactNode
         await logout();
         return null;
       }
-      if (!res.ok) throw new Error(`status ${res.status}`);
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.message || '');
       const user = (supabaseSession ? data.user : data) as UserProfile;
       const sub = localStorage.getItem(SUBROLE_KEY) as 'bunda' | 'ayah' | 'wali' | null;
       if (sub) setParentVariant(sub);
@@ -137,8 +169,12 @@ export function StoreProvider({ children: content }: { children: React.ReactNode
       setProfile(user);
       refreshNotifications();
       return user;
-    } catch {
-      toast({ title: 'Tidak dapat terhubung', body: 'Server FlourishCare belum merespons. Coba buka ulang aplikasi sebentar lagi.', tone: 'warning' });
+    } catch (err: any) {
+      toast({
+        title: 'Belum bisa memuat akun',
+        body: err?.message || 'Server FlourishCare belum merespons. Coba buka ulang aplikasi sebentar lagi.',
+        tone: 'warning',
+      });
       return null;
     }
   }, [logout, refreshChildren, refreshNotifications, toast]);
@@ -162,7 +198,7 @@ export function StoreProvider({ children: content }: { children: React.ReactNode
         if (ret.flow === 'recovery') {
           setRecoveryMode(true);
         } else {
-          toast({ title: `Halo, ${firstName(user.fullName)}`, body: ret.flow === 'confirm' ? 'Email terverifikasi. Akun Anda sudah aktif.' : 'Berhasil masuk dengan Google.' });
+          toast({ title: `Halo, ${firstName(user.fullName)}`, body: ret.flow === 'confirm' ? 'Email terverifikasi. Akun sudah aktif, selamat datang.' : 'Berhasil masuk dengan Google.' });
         }
       }
       setBooting(false);
@@ -212,6 +248,7 @@ export function StoreProvider({ children: content }: { children: React.ReactNode
     activeChild,
     setActiveChild,
     refreshChildren,
+    childrenStatus,
     refreshProfile,
     setProfile,
     establishSession,

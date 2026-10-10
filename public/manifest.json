@@ -1,18 +1,42 @@
 {
   "short_name": "FlourishCare",
-  "name": "FlourishCare: Rumah Tumbuh Kembang",
-  "description": "Pantau pertumbuhan, milestone, imunisasi, dan skrining dini si Kecil bersama psikolog dan terapis FlourishCare.",
+  "name": "FlourishCare: Aplikasi Tumbuh Kembang Anak",
+  "description": "#1 Aplikasi Tumbuh Kembang Anak di Indonesia. Pantau pertumbuhan, milestone, imunisasi, dan skrining dini si Kecil, didampingi psikolog dan terapis anak FlourishCare.",
   "lang": "id",
   "icons": [
-    { "src": "/icons/icon-192.png", "type": "image/png", "sizes": "192x192", "purpose": "any" },
-    { "src": "/icons/icon-512.png", "type": "image/png", "sizes": "512x512", "purpose": "any" },
-    { "src": "/icons/maskable-512.png", "type": "image/png", "sizes": "512x512", "purpose": "maskable" },
-    { "src": "/logo.svg", "type": "image/svg+xml", "sizes": "any" }
+    {
+      "src": "/icons/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/maskable-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/logo.svg",
+      "type": "image/svg+xml",
+      "sizes": "any"
+    }
   ],
   "start_url": "/",
   "scope": "/",
   "background_color": "#FFFAF5",
   "theme_color": "#FFFAF5",
   "display": "standalone",
-  "orientation": "portrait"
+  "orientation": "portrait",
+  "categories": [
+    "health",
+    "medical",
+    "lifestyle"
+  ]
 }

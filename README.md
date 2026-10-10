@@ -32,6 +32,8 @@ Vite 6, React 19, TypeScript, Tailwind CSS v4, Motion (motion/react), lucide-rea
 4. **Vercel > Project Settings > Environment Variables**: isi `SUPABASE_SECRET_KEY` (Supabase > Project Settings > API Keys > Secret keys). Lalu redeploy.
 5. Cek: buka app.flourishcare.id/api/supabase-status. Harus `"tablesReady": true` dan `"secretKey": true`.
 
+Di Vercel, server tidak pernah menyimpan data ke memori (data akan hilang di instance berikutnya). Kalau database belum siap, API menjawab 503 dan aplikasi menampilkan pesan, bukan meminta orang tua mengisi ulang data.
+
 Akun staf (yang di dashboard flourishcare.id bertanda staf) otomatis mendapat Mode ahli di Tanya Ahli. Agar jawaban tampil dengan nama dan foto psikolog, isi kolom `profile_id` di `staff_profiles` dengan id akun staf tersebut.
 
 ## Menjalankan di komputer

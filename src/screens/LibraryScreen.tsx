@@ -62,7 +62,7 @@ export default function LibraryScreen({ onBack }: { onBack?: () => void }) {
   const [featured, ...rest] = filtered;
 
   return (
-    <Screen title="Edukasi" subtitle="Ditulis dan ditinjau tenaga ahli" onBack={onBack}>
+    <Screen title="Edukasi" subtitle="Bacaan singkat dari tim psikolog dan terapis" onBack={onBack}>
       <div className="px-5">
         <label className="flex items-center gap-3 h-[52px] px-4 rounded-[18px] bg-white border border-line shadow-card focus-within:border-brand-orange transition-colors">
           <Search className="w-5 h-5 text-mute" strokeWidth={1.7} />

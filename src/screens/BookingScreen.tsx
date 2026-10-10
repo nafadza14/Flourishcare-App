@@ -773,7 +773,7 @@ function PaymentSheet({
         ) : (
           <Card className="p-4">
             <div className="text-[16px]">{info?.label}</div>
-            <p className="text-[14px] text-mute mt-1 leading-relaxed">Anda akan diarahkan ke aplikasi {info?.label} untuk menyetujui pembayaran.</p>
+            <p className="text-[14px] text-mute mt-1 leading-relaxed">Ayah Bunda akan diarahkan ke aplikasi {info?.label} untuk menyetujui pembayaran.</p>
           </Card>
         )}
         <Notice tone="neutral" icon={ClipboardList}>
