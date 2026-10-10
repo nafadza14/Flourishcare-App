@@ -7,7 +7,7 @@ import { useToast } from '../ui/Toast';
 import type { Child, GrowthRecord } from '../../types';
 import { sendJSON } from '../../api';
 import { emitDataChanged } from '../../lib/events';
-import { todayISO } from '../../lib/format';
+import { ageInMonths, todayISO } from '../../lib/format';
 
 interface Props {
   open: boolean;
@@ -38,6 +38,8 @@ export default function AddMeasurementSheet({ open, onClose, child, last }: Prop
   }, [open]);
 
   const parse = (v: string) => Number(v.replace(',', '.'));
+  const lying = ageInMonths(child.birthDate, date ? new Date(date) : new Date()) < 24;
+  const lengthWord = lying ? 'panjang badan' : 'tinggi badan';
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -48,8 +50,8 @@ export default function AddMeasurementSheet({ open, onClose, child, last }: Prop
     else if (date > todayISO()) e.date = 'Tanggal tidak boleh melewati hari ini.';
     else if (date < child.birthDate) e.date = 'Tanggal tidak boleh sebelum tanggal lahir.';
     if (!weight || !(w >= 0.5 && w <= 60)) e.weight = 'Isi berat antara 0,5 sampai 60 kg.';
-    if (!height || !(h >= 30 && h <= 150)) e.height = 'Isi tinggi antara 30 sampai 150 cm.';
-    if (!head || !(hc >= 25 && hc <= 60)) e.head = 'Isi lingkar kepala antara 25 sampai 60 cm.';
+    if (!height || !(h >= 30 && h <= 150)) e.height = `Isi ${lengthWord} antara 30 sampai 150 cm.`;
+    if (head && !(hc >= 25 && hc <= 60)) e.head = 'Isi lingkar kepala antara 25 sampai 60 cm, atau kosongkan.';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -70,7 +72,7 @@ export default function AddMeasurementSheet({ open, onClose, child, last }: Prop
         date,
         weightKg: parse(weight),
         heightCm: parse(height),
-        headCircumferenceCm: parse(head),
+        headCircumferenceCm: head ? parse(head) : null,
         notes: notes.trim(),
       });
       emitDataChanged('growth');
@@ -109,9 +111,9 @@ export default function AddMeasurementSheet({ open, onClose, child, last }: Prop
             error={errors.weight}
           />
           <Field
-            label="Tinggi"
+            label={lying ? 'Panjang badan' : 'Tinggi badan'}
             inputMode="decimal"
-            placeholder="84"
+            placeholder={lying ? '74' : '96'}
             icon={Ruler}
             suffix="cm"
             value={height}
@@ -120,7 +122,7 @@ export default function AddMeasurementSheet({ open, onClose, child, last }: Prop
           />
         </div>
         <Field
-          label="Lingkar kepala"
+          label={lying ? 'Lingkar kepala' : 'Lingkar kepala (opsional)'}
           inputMode="decimal"
           placeholder="48"
           icon={CircleDashed}
@@ -130,6 +132,11 @@ export default function AddMeasurementSheet({ open, onClose, child, last }: Prop
           error={errors.head}
         />
         <Field label="Catatan (opsional)" placeholder="Misalnya sedang tumbuh gigi" icon={NotebookPen} value={notes} onChange={(e) => setNotes(e.target.value)} />
+        <p className="text-[13px] text-mute leading-relaxed -mt-1">
+          {lying
+            ? 'Di bawah 2 tahun, ukur panjang badan sambil berbaring. Lingkar kepala diukur melingkari dahi dan bagian belakang kepala yang paling menonjol.'
+            : 'Di atas 2 tahun, ukur tinggi badan sambil berdiri tanpa alas kaki.'}
+        </p>
         {jumpWarning && <p className="text-[14px] text-[#9A6A12] bg-semantic-warning-soft rounded-[16px] px-4 py-3">{jumpWarning}</p>}
         {errors.form && <p className="text-[14px] text-semantic-danger">{errors.form}</p>}
       </div>

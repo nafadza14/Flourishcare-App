@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Activity, Baby, Calendar, ChartColumn, ChevronLeft, ClipboardCheck, Ear, Footprints, HeartHandshake, MessageCircle, Scale, Sparkles, X } from 'lucide-react';
+import { Activity, Baby, Calendar, CalendarHeart, ChartColumn, ChevronLeft, ClipboardCheck, Ear, Footprints, HeartHandshake, MessageCircle, Scale, Sparkles, X } from 'lucide-react';
+import Segmented from '../components/ui/Segmented';
+import { gestationLabel, hphtFromHpl, hplFromHpht, pregnancyStatus } from '../lib/pregnancy';
 import { Field, OptionCard, TextArea } from '../components/ui/Field';
 import { Button, IconButton } from '../components/ui/primitives';
 import Switch from '../components/ui/Switch';
@@ -12,7 +14,7 @@ import type { Child } from '../types';
 import { useStore } from '../lib/store';
 import { apiFetch } from '../api';
 import { emitDataChanged } from '../lib/events';
-import { firstName, todayISO } from '../lib/format';
+import { firstName, formatDate, todayISO, parseDate, daysBetween } from '../lib/format';
 import { haptic } from '../lib/haptics';
 import { cx } from '../lib/cx';
 
@@ -27,14 +29,21 @@ const CONCERNS = [
 interface Props {
   /** First-run flow shows a welcome step and cannot be dismissed */
   firstRun?: boolean;
+  /** Skip the "born or pregnant" question */
+  mode?: 'child' | 'pregnancy';
   onDone: (child: Child) => void;
   onCancel?: () => void;
 }
 
-export default function OnboardingScreen({ firstRun, onDone, onCancel }: Props) {
-  const { profile, refreshChildren, parentVariant } = useStore();
+export default function OnboardingScreen({ firstRun, mode, onDone, onCancel }: Props) {
+  const { profile, refreshChildren, parentVariant, setActiveChild } = useStore();
   const toast = useToast();
-  const steps = firstRun ? ['welcome', 'name', 'birth', 'concern', 'notes'] : ['name', 'birth', 'concern', 'notes'];
+  const [kind, setKind] = useState<'child' | 'pregnancy'>(mode ?? 'child');
+  const flow = kind === 'pregnancy' ? ['pregnancy'] : ['name', 'birth', 'concern', 'notes'];
+  const steps = [...(firstRun ? ['welcome'] : []), ...(mode ? [] : ['kind']), ...flow];
+  const [knows, setKnows] = useState<'hpht' | 'hpl'>('hpht');
+  const [pregDate, setPregDate] = useState('');
+  const [weeks, setWeeks] = useState('');
   const [index, setIndex] = useState(0);
   const [dir, setDir] = useState(1);
   const [name, setName] = useState('');
@@ -62,13 +71,15 @@ export default function OnboardingScreen({ firstRun, onDone, onCancel }: Props) 
     if (step === 'birth') {
       if (!birthDate) return setError('Isi tanggal lahir untuk menghitung usia dan milestone.');
       if (birthDate > todayISO()) return setError('Tanggal lahir tidak boleh melewati hari ini.');
+      if (premature && !(Number(weeks) >= 22 && Number(weeks) < 37)) return setError('Isi usia kehamilan saat lahir, antara 22 sampai 36 minggu.');
     }
+    if (step === 'pregnancy') return savePregnancy();
     if (step !== 'notes') return go(1);
 
     setSaving(true);
     const concernItem = CONCERNS.find((c) => c.val === concern);
     const combined = [concern !== 'umum' && concernItem ? `Fokus utama: ${concernItem.label}.` : '', notes.trim()].filter(Boolean).join(' ');
-    const payload = { name: name.trim(), birthDate, gender, isPremature: premature, medicalNotes: combined };
+    const payload = { name: name.trim(), birthDate, gender, isPremature: premature, gestationalWeeks: premature ? Number(weeks) : undefined, medicalNotes: combined };
     let child: Child | null = null;
     try {
       const res = await apiFetch('/api/children', {
@@ -94,6 +105,43 @@ export default function OnboardingScreen({ firstRun, onDone, onCancel }: Props) 
     window.setTimeout(() => onDone(child as Child), 900);
     setSaving(false);
   };
+
+  const pregPreview = (() => {
+    if (!pregDate) return null;
+    const hpl = knows === 'hpl' ? pregDate : hplFromHpht(pregDate);
+    const hpht = knows === 'hpht' ? pregDate : hphtFromHpl(pregDate);
+    const s = pregnancyStatus({ birthDate: hpl, expectedDueDate: hpl, lmpDate: hpht } as Child);
+    return { hpl, hpht, s };
+  })();
+
+  async function savePregnancy() {
+    if (!pregDate || !pregPreview) return setError(knows === 'hpht' ? 'Isi tanggal hari pertama haid terakhir.' : 'Isi tanggal perkiraan lahir.');
+    const days = daysBetween(parseDate(pregPreview.hpht), new Date());
+    if (days < 14) return setError('Tanggal belum sesuai. Usia kehamilan minimal 2 minggu dari HPHT.');
+    if (days > 44 * 7) return setError('Tanggal terlalu lama. Bila si Kecil sudah lahir, pilih profil anak.');
+    setSaving(true);
+    try {
+      const res = await apiFetch('/api/children', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isUnborn: true, name: name.trim() || 'Dedek', expectedDueDate: pregPreview.hpl, lmpDate: knows === 'hpht' ? pregDate : undefined }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.message || 'Profil belum tersimpan. Periksa koneksi lalu coba lagi.');
+      await refreshChildren(data.id);
+      setActiveChild(data.id);
+      emitDataChanged('children');
+      setCelebrate(true);
+      haptic('success');
+      toast({ title: 'Profil kehamilan siap', body: `Minggu ke-${pregPreview.s.weeks}. Kami temani sampai si Kecil lahir.` });
+      window.setTimeout(() => onDone(data as Child), 900);
+    } catch (err: any) {
+      haptic('warning');
+      setError(err?.message || 'Profil belum tersimpan.');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   const canGoBack = index > 0;
 
@@ -143,7 +191,7 @@ export default function OnboardingScreen({ firstRun, onDone, onCancel }: Props) 
               <div className="flex flex-col items-center text-center pt-6">
                 <div className="relative">
                   <motion.div initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 220, damping: 16 }}>
-                    <FlourishCareLogo className="w-28 h-28" animated />
+                    <FlourishCareLogo variant="full" className="w-44 h-auto" animated />
                   </motion.div>
                   <motion.div className="absolute -right-6 bottom-0" initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.3 }}>
                     <ParentAvatar variant={parentVariant} size={54} className="ring-4 ring-canvas rounded-full" />
@@ -171,6 +219,64 @@ export default function OnboardingScreen({ firstRun, onDone, onCancel }: Props) 
                     </motion.div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {step === 'kind' && (
+              <div>
+                <h1 className="text-[30px] leading-[1.15] tracking-[-0.02em] font-normal">Mau memantau siapa?</h1>
+                <p className="text-[16px] text-mute mt-2">Bisa ditambah lagi nanti, sampai 5 profil.</p>
+                <div className="space-y-2.5 mt-6" role="radiogroup" aria-label="Jenis profil">
+                  <OptionCard selected={kind === 'child'} onSelect={() => setKind('child')} icon={Baby} title="Si Kecil sudah lahir" description="Pantau pertumbuhan, milestone, imunisasi, dan skrining." />
+                  <OptionCard selected={kind === 'pregnancy'} onSelect={() => setKind('pregnancy')} icon={CalendarHeart} title="Saya sedang hamil" description="Perkembangan janin minggu demi minggu, HPL, dan hitung gerakan janin." />
+                </div>
+              </div>
+            )}
+
+            {step === 'pregnancy' && (
+              <div className="relative">
+                <h1 className="text-[30px] leading-[1.15] tracking-[-0.02em] font-normal">Kapan perkiraan lahirnya?</h1>
+                <p className="text-[16px] text-mute mt-2">Isi salah satu, kami hitung sisanya.</p>
+                <Segmented
+                  className="mt-6"
+                  value={knows}
+                  onChange={(v) => {
+                    setKnows(v);
+                    setPregDate('');
+                    setError('');
+                  }}
+                  options={[
+                    { value: 'hpht', label: 'Saya tahu HPHT' },
+                    { value: 'hpl', label: 'Saya tahu HPL' },
+                  ]}
+                />
+                <Field
+                  className="mt-4"
+                  label={knows === 'hpht' ? 'Hari pertama haid terakhir (HPHT)' : 'Hari perkiraan lahir (HPL)'}
+                  type="date"
+                  icon={Calendar}
+                  max={knows === 'hpht' ? todayISO() : undefined}
+                  min={knows === 'hpl' ? todayISO() : undefined}
+                  value={pregDate}
+                  onChange={(e) => {
+                    setPregDate(e.target.value);
+                    setError('');
+                  }}
+                  error={error}
+                />
+                <Field className="mt-4" label="Nama panggilan (opsional)" icon={Baby} value={name} onChange={(e) => setName(e.target.value)} placeholder="Contoh: Dedek" />
+                {pregPreview && pregPreview.s.totalDays >= 14 && (
+                  <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="mt-4 rounded-[20px] bg-brand-orange-tint p-4">
+                    <div className="text-[15px] text-mute">Usia kehamilan saat ini</div>
+                    <div className="text-[22px] leading-tight mt-0.5">{gestationLabel(pregPreview.s)}</div>
+                    <div className="text-[15px] text-ink-2 mt-1">HPL {formatDate(pregPreview.hpl, 'long')}</div>
+                  </motion.div>
+                )}
+                {celebrate && (
+                  <div className="absolute inset-x-0 top-24 h-0">
+                    <Confetti count={36} />
+                  </div>
+                )}
               </div>
             )}
 
@@ -239,6 +345,17 @@ export default function OnboardingScreen({ firstRun, onDone, onCancel }: Props) 
                   </div>
                   <Switch checked={premature} onChange={setPremature} label="Lahir prematur" />
                 </div>
+                {premature && (
+                  <Field
+                    className="mt-3"
+                    label="Usia kehamilan saat lahir"
+                    inputMode="numeric"
+                    suffix="minggu"
+                    value={weeks}
+                    onChange={(e) => setWeeks(e.target.value.replace(/[^0-9]/g, ''))}
+                    hint="Lihat di buku KIA. Dipakai untuk usia koreksi sampai usia 2 tahun."
+                  />
+                )}
               </div>
             )}
 
@@ -275,9 +392,9 @@ export default function OnboardingScreen({ firstRun, onDone, onCancel }: Props) 
       </div>
 
       <div className="px-6 pt-3 shrink-0" style={{ paddingBottom: 'calc(var(--sab) + 10px)' }}>
-        {error && step !== 'name' && step !== 'birth' && <p className="text-[14px] text-semantic-danger mb-2">{error}</p>}
+        {error && step !== 'name' && step !== 'birth' && step !== 'pregnancy' && <p className="text-[14px] text-semantic-danger mb-2">{error}</p>}
         <Button block size="lg" loading={saving} onClick={next}>
-          {step === 'welcome' ? 'Tambah profil si Kecil' : step === 'notes' ? 'Simpan profil' : 'Lanjut'}
+          {step === 'welcome' ? 'Mulai' : step === 'notes' || step === 'pregnancy' ? 'Simpan profil' : 'Lanjut'}
         </Button>
       </div>
     </div>

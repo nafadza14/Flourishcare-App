@@ -15,10 +15,13 @@ export default defineConfig(() => {
       rollupOptions: {
         output: {
           // Split stable vendor code so app updates do not invalidate it in the PWA cache
-          manualChunks: {
-            react: ['react', 'react-dom', 'react-dom/client'],
-            motion: ['motion', 'motion/react'],
-            icons: ['lucide-react'],
+          manualChunks(id) {
+            if (/node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) return 'react';
+            if (/node_modules[\\/](motion|framer-motion|motion-dom|motion-utils)[\\/]/.test(id)) return 'motion';
+            if (/node_modules[\\/]lucide-react[\\/]/.test(id)) return 'icons';
+            // Reference tables (WHO/CDC curves, KPSP, milestones) change rarely: own chunk, cached across app updates
+            if (/[\\/]src[\\/]data[\\/](growthRef|kpsp|milestonesCdc|tdd|gpph|speech|sensory|pregnancy|babyNorms|autismSigns)\.ts$/.test(id)) return 'reference';
+            return undefined;
           },
         },
       },

@@ -16,13 +16,26 @@ export interface Child {
   id: string;
   parentId: string;
   name: string;
+  /** Date of birth. For a pregnancy profile this holds the due date (HPL) until the baby is born. */
   birthDate: string;
-  expectedDueDate?: string; // for pregnancy tracker or premature calculations
+  /** HPL (hari perkiraan lahir) for a pregnancy profile */
+  expectedDueDate?: string;
   gender: 'L' | 'P'; // Laki-laki / Perempuan
+  /** Signed URL of the profile photo (short lived) */
   photoUrl?: string;
   isPremature: boolean;
   medicalNotes?: string;
   createdAt: string;
+  /** Still in the womb: the app shows the pregnancy tracker instead of child features */
+  isUnborn?: boolean;
+  /** HPHT (hari pertama haid terakhir), when known */
+  lmpDate?: string;
+  /** Gestational age at birth in weeks, used for corrected age */
+  gestationalWeeks?: number;
+  allergies?: string;
+  bloodType?: string;
+  /** Server only: storage path of the photo */
+  photoPath?: string;
 }
 
 export interface GrowthRecord {
@@ -72,14 +85,14 @@ export interface ChildImmunization {
   createdAt: string;
 }
 
-export type ScreeningType = 'kpsp' | 'mchat_r' | 'speech_delay';
+export type ScreeningType = 'kpsp' | 'tdd' | 'speech_delay' | 'autism_signs' | 'sensory' | 'gpph' | 'mchat_r';
 
 export interface Screening {
   id: string;
   childId: string;
   type: ScreeningType;
   ageMonthAtTest: number;
-  answers: Record<string, 'Ya' | 'Tidak' | boolean | string>;
+  answers: Record<string, 'Ya' | 'Tidak' | boolean | string | number>;
   score: number;
   result: 'normal' | 'meragukan' | 'penyimpangan' | 'risiko_rendah' | 'risiko_sedang' | 'risiko_tinggi';
   recommendation: string;
@@ -196,4 +209,43 @@ export interface NotificationPreferences {
   weeklyDigest: boolean;
   immunizationReminder: boolean;
   milestoneReminder: boolean;
+}
+
+export type BabyLogKind = 'feed' | 'sleep' | 'diaper' | 'pump' | 'kick';
+
+export interface BabyLog {
+  id: string;
+  childId: string;
+  kind: BabyLogKind;
+  /** feed: breast_left | breast_right | bottle_asi | bottle_formula | solid; diaper: wet | dirty | both; pump: left | right | both */
+  detail?: string;
+  startedAt: string;
+  /** Empty while a timer is running */
+  endedAt?: string | null;
+  amountMl?: number | null;
+  count?: number | null;
+  note?: string;
+  createdAt: string;
+}
+
+export interface MediaItem {
+  path: string;
+  type: 'image' | 'video';
+  /** Signed URL, filled in by the server when listing */
+  url?: string;
+  width?: number;
+  height?: number;
+}
+
+export type JournalCategory = 'momen_pertama' | 'makan' | 'tidur' | 'emosi' | 'kesehatan' | 'hari_spesial' | 'catatan';
+
+export interface JournalEntry {
+  id: string;
+  childId: string;
+  date: string;
+  category: JournalCategory;
+  title?: string;
+  body?: string;
+  media: MediaItem[];
+  createdAt: string;
 }

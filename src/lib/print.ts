@@ -7,6 +7,7 @@ export function printDocument(title: string, bodyHtml: string) {
 <html lang="id">
 <head>
 <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>${escapeHtml(title)}</title>
 <style>
   @page { margin: 18mm; }
@@ -30,6 +31,11 @@ export function printDocument(title: string, bodyHtml: string) {
   .result { border-radius: 14px; padding: 14px; margin-top: 8px; }
   .note { margin-top: 26px; font-size: 11px; color: #8E837B; border-top: 1px solid #F0E7DE; padding-top: 10px; }
   .sign { margin-top: 30px; text-align: right; }
+  .cta { display: flex; align-items: center; gap: 16px; margin-top: 24px; padding: 14px 16px; border-radius: 14px; border: 1.5px solid #F29935; background: #FFF7EE; break-inside: avoid; }
+  .cta img { width: 92px; height: 92px; flex-shrink: 0; }
+  .cta b { font-size: 14px; font-weight: 500; }
+  .cta .url { color: #C9671A; font-weight: 500; }
+  @media (max-width: 640px) { .meta { grid-template-columns: repeat(2, 1fr); } }
 </style>
 </head>
 <body>
@@ -73,6 +79,14 @@ export function printHeader(subtitle: string, code?: string) {
   return `<div class="head"><div class="brand"><img src="${origin}/brand/logo.png" alt="FlourishCare" style="height:56px;width:auto" /><div><div class="muted">${escapeHtml(subtitle)}</div></div></div>${
     code ? `<div class="muted" style="text-align:right">Kode<br/><b style="color:#231B16">${escapeHtml(code)}</b></div>` : ''
   }</div>`;
+}
+
+/** Booking call to action with a QR code to book.flourishcare.id */
+export function printCta(title: string, body: string) {
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  return `<div class="cta"><img src="${origin}/brand/qr-book.svg" alt="QR booking FlourishCare" /><div><b>${escapeHtml(title)}</b><div style="margin-top:4px">${escapeHtml(
+    body,
+  )}</div><div style="margin-top:6px">Pindai QR atau buka <span class="url">book.flourishcare.id</span></div></div></div>`;
 }
 
 /** Downscale a picked image to a small JPEG data URL (keeps uploads light). */

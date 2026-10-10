@@ -197,15 +197,15 @@ export function PhotoAvatar({ src, name, size = 48, className, rounded }: { src?
   );
 }
 
-/** Avatar for content signed by the clinic team as a whole */
+/** Avatar for content signed by the clinic team as a whole: the full FlourishCare logo on a white tile */
 export function TeamAvatar({ size = 34, className }: { size?: number; className?: string }) {
   return (
     <span
-      style={{ width: size, height: size }}
-      className={cx('shrink-0 rounded-full bg-white border border-line flex items-center justify-center', className)}
+      style={{ width: Math.round(size * 1.5), height: size }}
+      className={cx('shrink-0 rounded-[10px] bg-white border border-line flex items-center justify-center px-1', className)}
       aria-hidden
     >
-      <FlourishCareLogo className="w-[72%] h-[72%]" />
+      <FlourishCareLogo variant="full" className="w-full h-[88%]" />
     </span>
   );
 }

@@ -26,7 +26,7 @@ export default function CoverImage({ src, alt = '', className, markClassName = '
           state === 'ok' ? 'opacity-0' : 'opacity-100',
         )}
       >
-        <FlourishCareLogo className={cx(markClassName, 'opacity-60')} />
+        <FlourishCareLogo variant="full" className={cx(markClassName, 'opacity-60')} />
       </span>
       {state !== 'error' && src && (
         <img

@@ -22,27 +22,39 @@ import BookingScreen from './screens/BookingScreen';
 import BookingsScreen from './screens/BookingsScreen';
 import NotificationsScreen from './screens/NotificationsScreen';
 import AuthScreen from './screens/AuthScreen';
+import TrackScreen from './screens/TrackScreen';
+import ScreenHub from './screens/ScreenHub';
+import JournalScreen from './screens/JournalScreen';
+import BabyLogScreen from './screens/BabyLogScreen';
 import OnboardingScreen from './screens/OnboardingScreen';
 import NewPasswordSheet from './components/sheets/NewPasswordSheet';
 import InstallBanner, { DesktopInstallPanel } from './components/InstallBanner';
 import { takeAuthIntent } from './lib/supabase';
+import { isStandalone } from './lib/install';
 
-const TAB_KEYS: TabKey[] = ['home', 'child', 'vaccine', 'account'];
+const TAB_KEYS: TabKey[] = ['home', 'track', 'screen', 'account'];
 
 function Splash() {
+  // Installed on the phone: the system already showed the logo on its own opening screen,
+  // so the app only keeps the background to avoid showing the logo twice.
+  const [standalone] = useState(isStandalone);
   return (
     <motion.div
       className="absolute inset-0 z-[70] flex flex-col items-center justify-center bg-canvas-gradient"
       initial={{ opacity: 1 }}
-      exit={{ opacity: 0, scale: 1.04 }}
-      transition={{ duration: 0.4, ease: [0.32, 0.72, 0, 1] }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
     >
-      <motion.div initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 220, damping: 16 }}>
-        <FlourishCareLogo variant="full" className="w-56 h-auto" animated alt="FlourishCare" />
-      </motion.div>
-      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="mt-3 text-center">
-        <div className="text-[15px] text-mute">Setiap anak berhak tumbuh sepenuhnya</div>
-      </motion.div>
+      {!standalone && (
+        <>
+          <motion.div initial={{ scale: 0.85, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 220, damping: 18 }}>
+            <FlourishCareLogo variant="full" className="w-56 h-auto" animated alt="FlourishCare" />
+          </motion.div>
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="mt-3 text-center">
+            <div className="text-[15px] text-mute">Setiap anak berhak tumbuh sepenuhnya</div>
+          </motion.div>
+        </>
+      )}
     </motion.div>
   );
 }
@@ -57,7 +69,7 @@ function LoadError() {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
     >
-      <FlourishCareLogo className="w-20 h-20" animated />
+      <FlourishCareLogo variant="full" className="w-40 h-auto" />
       <h1 className="text-[26px] leading-tight tracking-[-0.02em] font-normal mt-5">Data si Kecil belum bisa dimuat</h1>
       <p className="text-[16px] text-mute mt-2 leading-relaxed max-w-[300px]">
         Tenang, data Ayah Bunda tidak hilang. Server kami sedang tidak terjangkau, coba lagi beberapa saat lagi.
@@ -135,7 +147,12 @@ function RouteView({ route, onBack }: { route: Route; onBack: () => void }) {
     case 'milestone':
       return <MilestoneScreen onBack={onBack} />;
     case 'screening':
+      if (!route.start && !route.reportId) return <ScreenHub onBack={onBack} />;
       return <ScreeningScreen onBack={onBack} start={route.start} reportId={route.reportId} />;
+    case 'journal':
+      return <JournalScreen onBack={onBack} compose={route.compose} />;
+    case 'babylog':
+      return <BabyLogScreen onBack={onBack} />;
     case 'stimulasi':
       return <StimulasiScreen onBack={onBack} />;
     case 'qa':
@@ -153,7 +170,7 @@ function RouteView({ route, onBack }: { route: Route; onBack: () => void }) {
     case 'auth':
       return <AuthScreen onBack={onBack} mode={route.mode} redirect={route.redirect} redirectTab={route.redirectTab} />;
     case 'onboarding':
-      return <OnboardingScreen onDone={onBack} onCancel={onBack} />;
+      return <OnboardingScreen onDone={onBack} onCancel={onBack} mode={route.mode} />;
     default:
       return null;
   }
@@ -163,10 +180,10 @@ function TabView({ tab }: { tab: TabKey }) {
   switch (tab) {
     case 'home':
       return <HomeScreen />;
-    case 'child':
-      return <ChildProfileScreen />;
-    case 'vaccine':
-      return <VaccineScreen />;
+    case 'track':
+      return <TrackScreen />;
+    case 'screen':
+      return <ScreenHub />;
     case 'account':
       return <AccountScreen />;
   }

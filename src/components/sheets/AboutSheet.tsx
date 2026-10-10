@@ -11,11 +11,12 @@ interface DbStatus {
   connected: boolean;
   tablesReady?: boolean;
   secretKey?: boolean;
+  migrationNeeded?: boolean;
   error?: string;
   hint?: string;
 }
 
-export const APP_VERSION = '1.5.1';
+export const APP_VERSION = '1.6.0';
 
 /** About the app. The database panel is only shown to clinic staff (setup help). */
 export default function AboutSheet({ open, onClose, showAdmin = false }: { open: boolean; onClose: () => void; showAdmin?: boolean }) {
@@ -29,7 +30,7 @@ export default function AboutSheet({ open, onClose, showAdmin = false }: { open:
     getJSON<DbStatus>('/api/supabase-status', { connected: false, error: 'Server tidak merespons' }).then(setStatus);
   }, [open, showAdmin]);
 
-  const ready = !!status?.tablesReady && !!status?.secretKey;
+  const ready = !!status?.tablesReady && !!status?.secretKey && !status?.migrationNeeded;
 
   const copy = async () => {
     try {
@@ -51,7 +52,7 @@ export default function AboutSheet({ open, onClose, showAdmin = false }: { open:
           <div className="text-[14px] text-mute mt-2">Aplikasi tumbuh kembang anak · versi {APP_VERSION}</div>
         </div>
         <p className="text-[16px] text-ink-2 leading-relaxed">
-          FlourishCare membantu Ayah Bunda memantau pertumbuhan, milestone, imunisasi, dan skrining dini si Kecil. Saat butuh bantuan lebih, psikolog dan terapis FlourishCare di Klinik Mitra Diani, Jakarta Timur, siap mendampingi.
+          FlourishCare membantu Ayah Bunda memantau kehamilan, pertumbuhan, milestone, imunisasi, catatan harian, dan skrining dini si Kecil. Saat butuh bantuan lebih, psikolog dan terapis FlourishCare di Klinik Mitra Diani, Jakarta Timur, siap mendampingi.
         </p>
 
         {showAdmin && (

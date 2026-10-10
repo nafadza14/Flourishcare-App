@@ -5,8 +5,8 @@
  *   so a new logo shows up right away instead of staying stuck in the cache
  * - API requests: always network (never cached), so data stays fresh
  */
-const VERSION = 'flourishcare-v4';
-const ICON_V = '2';
+const VERSION = 'flourishcare-v5';
+const ICON_V = '3';
 const SHELL = [
   '/',
   '/manifest.json',

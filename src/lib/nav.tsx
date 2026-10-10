@@ -3,7 +3,7 @@ import { openExternalBooking, USE_EXTERNAL_BOOKING } from './booking';
 import type { ScreeningType } from '../types';
 import type { ServiceCategory } from '../data/pricing';
 
-export type TabKey = 'home' | 'child' | 'vaccine' | 'account';
+export type TabKey = 'home' | 'track' | 'screen' | 'account';
 
 export type Route =
   | { name: 'child' }
@@ -18,7 +18,9 @@ export type Route =
   | { name: 'booking'; category?: ServiceCategory; subCode?: string; therapistId?: string }
   | { name: 'bookings' }
   | { name: 'notifications' }
-  | { name: 'onboarding' }
+  | { name: 'onboarding'; mode?: 'child' | 'pregnancy' }
+  | { name: 'journal'; compose?: boolean }
+  | { name: 'babylog' }
   | { name: 'auth'; mode?: 'login' | 'register'; redirect?: Route; redirectTab?: TabKey };
 
 export interface StackEntry {

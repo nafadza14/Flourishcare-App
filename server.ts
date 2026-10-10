@@ -20,6 +20,7 @@ import type {
 } from './src/types.js';
 import { calculatePrice, isTherapyCategory, type ServiceCategory, type PackageSize } from './src/data/pricing.js';
 import { FALLBACK_TEAM, mapStaffProfile, TEAM_SIGNATURE, CLINIC_LOCATION, type ClinicalExpert, type StaffProfileRow } from './src/data/team.js';
+import { isMissingSchemaError, MigrationNeededError, registerFeatureRoutes, signPaths, STORAGE_PREFIX } from './server/features.js';
 
 /** Keep AI and server copy free of em dashes (house style). */
 function stripEmDash(text: string): string {
@@ -717,18 +718,27 @@ const PORT = Number(process.env.PORT) || 3000;
       const { data, error } = await supabase.from('app_children').select('*').eq('parent_id', userId);
       if (error) throw error;
       if (data && (data.length > 0 || STRICT_DB)) {
-        return data.map(item => ({
-          id: item.id,
-          parentId: item.parent_id,
-          name: item.name,
-          birthDate: item.birth_date,
-          expectedDueDate: item.expected_due_date,
-          gender: item.gender as 'L' | 'P',
-          photoUrl: item.photo_url,
-          isPremature: item.is_premature,
-          medicalNotes: item.medical_notes,
-          createdAt: item.created_at
-        }));
+        return data.map(item => {
+          const photo = typeof item.photo_url === 'string' ? item.photo_url : '';
+          return {
+            id: item.id,
+            parentId: item.parent_id,
+            name: item.name,
+            birthDate: item.birth_date,
+            expectedDueDate: item.expected_due_date || undefined,
+            gender: (item.gender === 'P' ? 'P' : 'L') as 'L' | 'P',
+            photoUrl: photo && !photo.startsWith(STORAGE_PREFIX) ? photo : undefined,
+            photoPath: photo.startsWith(STORAGE_PREFIX) ? photo.slice(STORAGE_PREFIX.length) : undefined,
+            isPremature: !!item.is_premature,
+            medicalNotes: item.medical_notes || '',
+            isUnborn: !!item.is_unborn,
+            lmpDate: item.lmp_date || undefined,
+            gestationalWeeks: typeof item.gestational_weeks === 'number' ? item.gestational_weeks : undefined,
+            allergies: item.allergies || '',
+            bloodType: item.blood_type || '',
+            createdAt: item.created_at
+          };
+        });
       }
     } catch (err: any) {
       failIfStrict(err);
@@ -748,21 +758,36 @@ const PORT = Number(process.env.PORT) || 3000;
     } else {
       children.push(child);
     }
+    const base = {
+      id: child.id,
+      parent_id: child.parentId,
+      name: child.name,
+      birth_date: child.birthDate,
+      expected_due_date: child.expectedDueDate ?? null,
+      gender: child.gender,
+      photo_url: child.photoPath ? STORAGE_PREFIX + child.photoPath : child.photoUrl ?? null,
+      is_premature: child.isPremature,
+      medical_notes: child.medicalNotes,
+      created_at: child.createdAt
+    };
+    const extra = {
+      is_unborn: !!child.isUnborn,
+      lmp_date: child.lmpDate ?? null,
+      gestational_weeks: child.gestationalWeeks ?? null,
+      allergies: child.allergies ?? null,
+      blood_type: child.bloodType ?? null,
+    };
     try {
-      const { error: dbError } = await supabase.from('app_children').upsert({
-        id: child.id,
-        parent_id: child.parentId,
-        name: child.name,
-        birth_date: child.birthDate,
-        expected_due_date: child.expectedDueDate,
-        gender: child.gender,
-        photo_url: child.photoUrl,
-        is_premature: child.isPremature,
-        medical_notes: child.medicalNotes,
-        created_at: child.createdAt
-      });
+      let { error: dbError } = await supabase.from('app_children').upsert({ ...base, ...extra });
+      if (dbError && isMissingSchemaError(dbError)) {
+        // Database not migrated yet: keep the basic profile working, refuse only the new data
+        const usesNew = !!(child.isUnborn || child.lmpDate || child.gestationalWeeks || child.allergies || child.bloodType);
+        if (usesNew) throw new MigrationNeededError(dbError.message);
+        ({ error: dbError } = await supabase.from('app_children').upsert(base));
+      }
       if (dbError) throw dbError;
     } catch (err: any) {
+      if (err instanceof MigrationNeededError) throw err;
       failIfStrict(err);
       console.warn('Supabase saveChild failed, updated memory only:', err.message || err);
     }
@@ -795,7 +820,7 @@ const PORT = Number(process.env.PORT) || 3000;
           date: item.date,
           weightKg: Number(item.weight_kg),
           heightCm: Number(item.height_cm),
-          headCircumferenceCm: Number(item.head_circumference_cm),
+          headCircumferenceCm: item.head_circumference_cm === null || item.head_circumference_cm === undefined ? 0 : Number(item.head_circumference_cm),
           notes: item.notes,
           createdAt: item.created_at
         })).sort((a,b) => a.date.localeCompare(b.date));
@@ -820,7 +845,7 @@ const PORT = Number(process.env.PORT) || 3000;
         date: record.date,
         weight_kg: record.weightKg,
         height_cm: record.heightCm,
-        head_circumference_cm: record.headCircumferenceCm,
+        head_circumference_cm: record.headCircumferenceCm > 0 ? record.headCircumferenceCm : null,
         notes: record.notes,
         created_at: record.createdAt
       });
@@ -1311,7 +1336,24 @@ const PORT = Number(process.env.PORT) || 3000;
               : 'Tambahkan SUPABASE_SECRET_KEY di Vercel agar server bisa membaca tabel yang dilindungi RLS.',
         });
       }
-      res.json({ ...base, connected: true, tablesReady: true, info: 'Supabase terhubung. Data tersimpan permanen.' });
+      // v1.6 tables and columns (Pantau dan Skrining)
+      const checks = await Promise.all([
+        supabase.from('app_children').select('is_unborn,lmp_date,gestational_weeks,allergies,blood_type').limit(1),
+        supabase.from('app_journal_entries').select('id').limit(1),
+        supabase.from('app_baby_logs').select('id').limit(1),
+      ]);
+      const missingParts = ['kolom profil anak', 'app_journal_entries', 'app_baby_logs'].filter((_, i) => !!checks[i].error);
+      if (missingParts.length) {
+        return res.json({
+          ...base,
+          connected: true,
+          tablesReady: true,
+          migrationNeeded: true,
+          missing: missingParts,
+          hint: 'Database perlu diperbarui untuk fitur Pantau dan Skrining. Jalankan supabase/migrations/2026-10-10_pantau_skrining.sql di Supabase SQL Editor.',
+        });
+      }
+      res.json({ ...base, connected: true, tablesReady: true, migrationNeeded: false, info: 'Supabase terhubung. Data tersimpan permanen.' });
     } catch (err: any) {
       res.json({ ...base, connected: false, tablesReady: false, error: err.message || 'Network/Connection error', hint: 'Periksa koneksi dan variabel lingkungan Supabase.' });
     }
@@ -1533,59 +1575,105 @@ const PORT = Number(process.env.PORT) || 3000;
   }
 
   // Children Endpoints
+  const MAX_PROFILES = 5;
+  const BLOOD_TYPES = ['', 'A', 'B', 'AB', 'O', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+  const isoDate = (v: unknown) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined);
+
+  /** Fields a parent may set on a profile (shared by create and update) */
+  function childFields(body: any, userId: string, childId?: string): Partial<Child> {
+    const out: Partial<Child> = {};
+    if (typeof body.name === 'string') out.name = body.name.trim().slice(0, 60) || 'Si Kecil';
+    if (isoDate(body.birthDate)) out.birthDate = body.birthDate;
+    if (body.gender === 'L' || body.gender === 'P') out.gender = body.gender;
+    if (typeof body.isPremature === 'boolean') out.isPremature = body.isPremature;
+    if (typeof body.medicalNotes === 'string') out.medicalNotes = body.medicalNotes.slice(0, 2000);
+    if (typeof body.allergies === 'string') out.allergies = body.allergies.slice(0, 500);
+    if (typeof body.bloodType === 'string' && BLOOD_TYPES.includes(body.bloodType)) out.bloodType = body.bloodType;
+    if (typeof body.isUnborn === 'boolean') out.isUnborn = body.isUnborn;
+    if (body.expectedDueDate === null) out.expectedDueDate = undefined;
+    else if (isoDate(body.expectedDueDate)) out.expectedDueDate = body.expectedDueDate;
+    if (body.lmpDate === null) out.lmpDate = undefined;
+    else if (isoDate(body.lmpDate)) out.lmpDate = body.lmpDate;
+    if (body.gestationalWeeks === null) out.gestationalWeeks = undefined;
+    else if (Number.isFinite(Number(body.gestationalWeeks)) && Number(body.gestationalWeeks) >= 22 && Number(body.gestationalWeeks) <= 44) {
+      out.gestationalWeeks = Math.round(Number(body.gestationalWeeks));
+    }
+    if (body.photoPath === null) {
+      out.photoPath = undefined;
+      out.photoUrl = undefined;
+    } else if (typeof body.photoPath === 'string' && childId && body.photoPath.startsWith(`${userId}/${childId}/avatar/`)) {
+      out.photoPath = body.photoPath;
+    }
+    return out;
+  }
+
+  async function withPhotos(list: Child[]): Promise<Child[]> {
+    const urls = await signPaths(supabase, list.map((c) => c.photoPath || '').filter(Boolean));
+    return list.map(({ photoPath, ...c }) => ({ ...c, photoUrl: photoPath ? urls[photoPath] : c.photoUrl }));
+  }
+
   app.get('/api/children', async (req: Request, res: Response) => {
     const userId = getUserId(req);
     const list = await getChildren(userId);
-    res.json(list);
+    res.json(await withPhotos(list.sort((a, b) => a.createdAt.localeCompare(b.createdAt))));
   });
 
   app.post('/api/children', async (req: Request, res: Response) => {
     const userId = getUserId(req);
-    try {
-      const newChild: Child = {
-        id: uid('c_'),
-        parentId: userId,
-        name: req.body.name || 'Si Kecil',
-        birthDate: req.body.birthDate || new Date().toISOString().split('T')[0],
-        gender: req.body.gender || 'L',
-        isPremature: req.body.isPremature || false,
-        medicalNotes: req.body.medicalNotes || '',
-        expectedDueDate: req.body.expectedDueDate,
-        createdAt: new Date().toISOString()
-      };
-      await saveChild(newChild);
-      res.status(201).json(newChild);
-    } catch (err: any) {
-      failIfStrict(err);
-      console.error('Crash in POST /api/children:', err);
-      const fallbackChild: Child = {
-        id: uid('c_fallback_'),
-        parentId: userId,
-        name: req.body.name || 'Si Kecil',
-        birthDate: req.body.birthDate || new Date().toISOString().split('T')[0],
-        gender: req.body.gender || 'L',
-        isPremature: req.body.isPremature || false,
-        medicalNotes: req.body.medicalNotes || '',
-        createdAt: new Date().toISOString()
-      };
-      children.push(fallbackChild);
-      res.status(201).json(fallbackChild);
+    const existing = await getChildren(userId);
+    if (existing.length >= MAX_PROFILES) {
+      return res.status(400).json({ error: 'limit', message: `Maksimal ${MAX_PROFILES} profil anak dan kehamilan dalam satu akun.` });
     }
+    const fields = childFields(req.body || {}, userId);
+    if (fields.isUnborn && !fields.expectedDueDate && !fields.lmpDate) {
+      return res.status(400).json({ error: 'invalid', message: 'Isi HPHT atau HPL untuk profil kehamilan.' });
+    }
+    const today = new Date().toISOString().split('T')[0];
+    const newChild: Child = {
+      id: uid('c_'),
+      parentId: userId,
+      name: fields.name || (fields.isUnborn ? 'Dedek' : 'Si Kecil'),
+      birthDate: fields.isUnborn ? fields.expectedDueDate || today : fields.birthDate || today,
+      gender: fields.gender || 'L',
+      isPremature: fields.isPremature || false,
+      medicalNotes: fields.medicalNotes || '',
+      expectedDueDate: fields.expectedDueDate,
+      isUnborn: fields.isUnborn || false,
+      lmpDate: fields.lmpDate,
+      gestationalWeeks: fields.gestationalWeeks,
+      allergies: fields.allergies || '',
+      bloodType: fields.bloodType || '',
+      createdAt: new Date().toISOString()
+    };
+    if (!newChild.isUnborn && newChild.birthDate > today) {
+      return res.status(400).json({ error: 'invalid', message: 'Tanggal lahir tidak boleh melewati hari ini.' });
+    }
+    await saveChild(newChild);
+    const [out] = await withPhotos([newChild]);
+    res.status(201).json(out);
   });
 
   app.put('/api/children/:id', async (req: Request, res: Response) => {
     const userId = getUserId(req);
     const { id } = req.params;
     const list = await getChildren(userId);
-    const index = list.findIndex(c => c.id === id);
-    if (index !== -1) {
-      const { id: _id, parentId: _parentId, createdAt: _createdAt, ...changes } = req.body || {};
-      const updated = { ...list[index], ...changes };
-      await saveChild(updated);
-      res.json(updated);
-    } else {
-      res.status(404).json({ error: 'Child not found' });
+    const current = list.find(c => c.id === id);
+    if (!current) return res.status(404).json({ error: 'not_found', message: 'Profil anak tidak ditemukan.' });
+    const fields = childFields(req.body || {}, userId, id);
+    const updated: Child = { ...current, ...fields };
+    if ('photoPath' in fields && fields.photoPath === undefined) updated.photoUrl = undefined;
+    // Born: the pregnancy profile becomes a child profile, birth date replaces the due date
+    if (current.isUnborn && fields.isUnborn === false && !fields.birthDate) {
+      return res.status(400).json({ error: 'invalid', message: 'Isi tanggal lahir si Kecil.' });
     }
+    if (updated.isUnborn && fields.expectedDueDate) updated.birthDate = fields.expectedDueDate;
+    if (!updated.isUnborn && updated.birthDate > new Date().toISOString().split('T')[0]) {
+      return res.status(400).json({ error: 'invalid', message: 'Tanggal lahir tidak boleh melewati hari ini.' });
+    }
+    if (typeof updated.gestationalWeeks === 'number') updated.isPremature = updated.gestationalWeeks < 37;
+    await saveChild(updated);
+    const [out] = await withPhotos([updated]);
+    res.json(out);
   });
 
   app.delete('/api/children/:id', async (req: Request, res: Response) => {
@@ -1605,13 +1693,16 @@ const PORT = Number(process.env.PORT) || 3000;
 
   app.post('/api/growth', async (req: Request, res: Response) => {
     if (!(await guardChild(req, res, req.body?.childId))) return;
+    if (!(Number(req.body.weightKg) > 0) || !(Number(req.body.heightCm) > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(String(req.body.date || ''))) {
+      return res.status(400).json({ error: 'invalid', message: 'Isi tanggal, berat, dan panjang atau tinggi badan.' });
+    }
     const record: GrowthRecord = {
       id: uid('g_'),
       childId: req.body.childId,
       date: req.body.date,
       weightKg: Number(req.body.weightKg),
       heightCm: Number(req.body.heightCm),
-      headCircumferenceCm: Number(req.body.headCircumferenceCm),
+      headCircumferenceCm: Number(req.body.headCircumferenceCm) > 0 ? Number(req.body.headCircumferenceCm) : 0,
       notes: req.body.notes || '',
       createdAt: new Date().toISOString()
     };
@@ -1752,13 +1843,13 @@ const PORT = Number(process.env.PORT) || 3000;
     if (screening.result.includes('risiko_tinggi') || screening.result === 'penyimpangan' || screening.result === 'risiko_sedang' || screening.result === 'meragukan') {
       const kids = await getChildren(activeProf.id);
       const childName = kids.find(c => c.id === screening.childId)?.name || 'si Kecil';
-      const typeLabel = screening.type === 'mchat_r' ? 'M-CHAT-R' : screening.type === 'speech_delay' ? 'bicara' : 'KPSP';
+      const typeLabel = ({ kpsp: 'KPSP', tdd: 'daya dengar', speech_delay: 'bicara', autism_signs: 'tanda awal autisme', sensory: 'sensori', gpph: 'perhatian dan hiperaktivitas', mchat_r: 'M-CHAT-R' } as Record<string, string>)[screening.type] || 'perkembangan';
       const newNotif: Notification = {
         id: uid('n_'),
         parentId: activeProf.id,
         type: 'screening',
         title: `Hasil skrining ${typeLabel} ${childName}`,
-        body: `Hasil skrining menunjukkan ${screening.result.replace('_', ' ')}. Lihat rekomendasi dan pilihan konsultasi bersama psikolog kami.`,
+        body: `Ada hasil yang perlu diperhatikan. Lihat rekomendasi dan pilihan konsultasi bersama psikolog kami.`,
         deepLink: 'screenings',
         read: false,
         createdAt: new Date().toISOString()
@@ -2089,7 +2180,13 @@ Gunakan bahasa Indonesia yang santun dan paragraf yang rapi. Jangan menyebut nam
   // ==========================================
   
   // Errors from any route end here
+  registerFeatureRoutes({ app, supabase, strictDb: STRICT_DB, uid, getUserId, guardChild, failIfStrict });
+
   app.use((err: any, _req: Request, res: Response, _next: any) => {
+    if (err instanceof MigrationNeededError) {
+      console.error('Database migration needed:', err.message);
+      return res.status(503).json({ error: 'migration_needed', message: 'Fitur ini belum aktif karena database sedang diperbarui. Coba lagi nanti ya.' });
+    }
     if (err instanceof DbUnavailableError) {
       console.error('Database unavailable:', err.message);
       return res.status(503).json({ error: 'db_unavailable', message: 'Data belum bisa disimpan karena database sedang tidak tersedia. Coba lagi sebentar lagi.' });

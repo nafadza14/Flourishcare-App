@@ -14,7 +14,7 @@ export const LOGO_SRC = {
 } as const;
 
 /** Home screen icon (bump ?v= when the icon files change, so phones fetch the new one) */
-export const APP_ICON_SRC = '/icons/icon-192.png?v=2';
+export const APP_ICON_SRC = '/icons/icon-192.png?v=3';
 
 interface FlourishCareLogoProps {
   className?: string;

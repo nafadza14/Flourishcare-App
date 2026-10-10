@@ -15,6 +15,7 @@ import { emitDataChanged } from '../lib/events';
 import { haptic } from '../lib/haptics';
 import { listContainer, listItem } from '../lib/motion';
 import { cx } from '../lib/cx';
+import UnbornGate from '../components/child/UnbornGate';
 
 export default function StimulasiScreen({ onBack }: { onBack?: () => void }) {
   const { activeChild } = useStore();
@@ -31,6 +32,13 @@ export default function StimulasiScreen({ onBack }: { onBack?: () => void }) {
   }, [activeChild?.id]);
 
   if (!activeChild) return null;
+  if (activeChild.isUnborn) {
+    return (
+      <Screen title="Stimulasi" onBack={onBack}>
+        <UnbornGate name={activeChild.name} />
+      </Screen>
+    );
+  }
   const age = ageInMonths(activeChild.birthDate);
   const activities = activitiesForAge(age);
   const doneCount = activities.filter((a) => done.includes(a.id)).length;

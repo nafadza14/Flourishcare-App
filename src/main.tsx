@@ -2,6 +2,7 @@ import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 // Listen for the install prompt before React mounts, so it is never missed
 import './lib/install';
+import { watchForUpdates } from './lib/freshness';
 import App from './App.tsx';
 import './index.css';
 
@@ -13,6 +14,8 @@ if ('serviceWorker' in navigator) {
       .catch(err => console.error('Service Worker registration failed:', err));
   });
 }
+
+watchForUpdates();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

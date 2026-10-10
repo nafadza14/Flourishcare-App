@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { openExternalBooking, USE_EXTERNAL_BOOKING } from '../lib/booking';
 import { motion } from 'motion/react';
-import { ArrowUpRight, Bell, BellRing, CalendarCheck, Check, Info, LogOut, Mail, MapPin, MessageCircle, MessageCircleHeart, Pencil, Phone, Plus, Smartphone, Syringe, Footprints, User } from 'lucide-react';
+import { ArrowUpRight, Baby, Bell, BellRing, CalendarCheck, Check, HeartHandshake, Info, LogOut, Mail, MapPin, MessageCircle, MessageCircleHeart, Pencil, Phone, Plus, Smartphone, Syringe, Footprints, User } from 'lucide-react';
 import Screen from '../components/ui/Screen';
 import Sheet from '../components/ui/Sheet';
 import Switch from '../components/ui/Switch';
 import { Field } from '../components/ui/Field';
 import { Button, Card } from '../components/ui/primitives';
 import { ListGroup, ListRow } from '../components/ui/ListGroup';
-import { KidAvatar, ParentAvatar } from '../components/ui/Avatar';
+import { ParentAvatar } from '../components/ui/Avatar';
+import ChildAvatar from '../components/child/ChildAvatar';
+import { profileAgeLabel } from '../lib/pregnancy';
 import { useToast } from '../components/ui/Toast';
 import AboutSheet, { APP_VERSION } from '../components/sheets/AboutSheet';
 import InstallGuideSheet from '../components/sheets/InstallGuideSheet';
@@ -133,13 +135,13 @@ export default function AccountScreen() {
         </Card>
       </div>
 
-      <ListGroup title="Anak saya" className="mt-7">
+      <ListGroup title="Anak dan kehamilan" className="mt-7">
         {children.map((c) => (
           <ListRow
             key={c.id}
-            leading={<KidAvatar gender={c.gender} size={40} />}
+            leading={<ChildAvatar child={c} size={40} />}
             title={c.name}
-            subtitle={ageLabel(c.birthDate)}
+            subtitle={profileAgeLabel(c, ageLabel)}
             trailing={
               c.id === activeChild?.id ? (
                 <span className="w-6 h-6 rounded-full bg-brand-orange text-white flex items-center justify-center">
@@ -155,7 +157,14 @@ export default function AccountScreen() {
             }}
           />
         ))}
-        {children.length < 5 && <ListRow icon={Plus} iconTone="gray" title="Tambah anak" onClick={() => nav.push({ name: 'onboarding' })} />}
+        {children.length < 5 ? (
+          <>
+            <ListRow icon={Plus} iconTone="gray" title="Tambah anak" onClick={() => nav.push({ name: 'onboarding', mode: 'child' })} />
+            <ListRow icon={HeartHandshake} iconTone="gray" title="Sedang hamil" subtitle="Pantau kehamilan minggu demi minggu" onClick={() => nav.push({ name: 'onboarding', mode: 'pregnancy' })} />
+          </>
+        ) : (
+          <ListRow icon={Baby} iconTone="gray" title="Maksimal 5 profil" subtitle="Hapus profil lama untuk menambah yang baru" />
+        )}
       </ListGroup>
 
       <ListGroup title="Aktivitas" className="mt-7">

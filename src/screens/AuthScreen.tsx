@@ -187,9 +187,7 @@ export default function AuthScreen({
     >
       <div className="px-5">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center text-center pt-2">
-          <div className="w-20 h-20 rounded-[26px] bg-white shadow-raised border border-line flex items-center justify-center">
-            <FlourishCareLogo className="w-14 h-14" animated />
-          </div>
+          <FlourishCareLogo variant="full" className="h-20 w-auto" animated />
           <h1 className="text-[30px] leading-tight tracking-[-0.02em] font-normal mt-5">{mode === 'login' ? 'Selamat datang kembali' : 'Buat akun gratis'}</h1>
           <p className="text-[16px] text-mute mt-1.5 max-w-[300px]">
             {mode === 'login' ? 'Lanjutkan memantau tumbuh kembang si Kecil.' : 'Pantau si Kecil bersama psikolog dan terapis anak FlourishCare.'}

@@ -2,8 +2,12 @@ import React, { useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import {
   Bell,
+  Baby,
+  BookHeart,
   BookOpen,
   CalendarCheck,
+  HeartPulse,
+  Milk,
   ChartColumn,
   ChevronDown,
   ChevronRight,
@@ -31,10 +35,17 @@ import { useStore } from '../lib/store';
 import { useNav, type Route } from '../lib/nav';
 import { useChildData } from '../lib/useChildData';
 import { ageInMonths, ageLabel, firstName, formatDate, formatNumber } from '../lib/format';
-import { getWeightStatus, latestRecord } from '../lib/growth';
-import { lateMilestones, rangeForAge, rangeProgress } from '../lib/milestones';
+import { getGrowthStatus, latestRecord } from '../lib/growth';
+import { checkpointForAge, checkpointShortLabel, devAgeMonths, lateMilestones, progressAt } from '../lib/milestones';
+import { instrumentInfo, suggestions } from '../lib/screening';
+import ChildAvatar from '../components/child/ChildAvatar';
+import BabyQuickCard from '../components/babylog/BabyQuick';
+import { useBabyLogs, TRACKER_MAX_MONTHS } from '../lib/babylog';
+import { countdownLabel, gestationLabel, pregnancyStatus } from '../lib/pregnancy';
+import type { Child } from '../types';
 import { buildVaccineSchedule, nextVaccine, vaccineTiming } from '../lib/vaccines';
 import { resultLabel } from '../lib/screening';
+import type { TabKey } from '../lib/nav';
 import { activitiesForAge, getCompleted } from '../lib/stimulasi';
 import { tipOfTheDay } from '../lib/tips';
 import { ARTICLES_SEED } from '../data/seedData';
@@ -47,7 +58,8 @@ interface Feature {
   title: string;
   status: string;
   icon: LucideIcon;
-  route: Route;
+  route?: Route;
+  tab?: TabKey;
   hero?: boolean;
 }
 
@@ -88,7 +100,9 @@ const GUEST_FEATURES: Feature[] = [
   { key: 'vaccine', title: 'Jadwal Imunisasi', status: 'Sesuai jadwal IDAI', icon: Syringe, route: { name: 'vaccine' }, hero: true },
   { key: 'growth', title: 'Pertumbuhan', status: 'Grafik standar WHO', icon: ChartColumn, route: { name: 'growth' } },
   { key: 'milestone', title: 'Milestone', status: 'Ceklis sesuai usia', icon: Footprints, route: { name: 'milestone' } },
-  { key: 'screening', title: 'Skrining Dini', status: 'KPSP & M-CHAT-R', icon: ClipboardCheck, route: { name: 'screening' } },
+  { key: 'screening', title: 'Skrining Dini', status: 'KPSP, bicara, autisme, sensori', icon: ClipboardCheck, tab: 'screen' },
+  { key: 'pregnancy', title: 'Kehamilan', status: 'HPL dan janin tiap minggu', icon: Baby, tab: 'track' },
+  { key: 'journal', title: 'Jurnal & Album', status: 'Simpan momen pertama', icon: BookHeart, route: { name: 'journal' } },
   { key: 'stimulasi', title: 'Stimulasi', status: 'Ide main tiap hari', icon: Puzzle, route: { name: 'stimulasi' } },
   { key: 'qa', title: 'Tanya Ahli', status: 'Dijawab psikolog & terapis', icon: MessageCircleHeart, route: { name: 'qa' } },
   { key: 'library', title: 'Edukasi', status: 'Bacaan dari tim ahli', icon: BookOpen, route: { name: 'library' } },
@@ -158,7 +172,7 @@ function StaffHome() {
   return (
     <Screen title="Beranda" hideNav largeTitle={false} withTabBar bottomSpacer={false}>
       <div className="px-5 pt-3 flex items-center gap-2.5">
-        <FlourishCareLogo className="w-11 h-11" animated />
+        <FlourishCareLogo variant="full" className="h-10 w-auto" />
         <div>
           <div className="text-[19px] leading-tight">Hai, {firstName(profile?.fullName)}</div>
           <div className="text-[13px] text-mute">Mode tim FlourishCare</div>
@@ -188,13 +202,7 @@ function GuestHome() {
   return (
     <Screen title="Beranda" hideNav largeTitle={false} withTabBar bottomSpacer={false}>
       <div className="px-5 pt-3 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <FlourishCareLogo className="w-12 h-12" animated />
-          <div>
-            <FlourishCareLogo variant="wordmark" className="h-[21px] w-auto" alt="FlourishCare" />
-            <div className="text-[13px] text-mute mt-0.5">Aplikasi tumbuh kembang anak</div>
-          </div>
-        </div>
+        <FlourishCareLogo variant="full" className="h-[52px] w-auto" alt="FlourishCare" />
         <Button size="sm" variant="secondary" onClick={() => nav.push({ name: 'auth', mode: 'login' })}>
           Masuk
         </Button>
@@ -203,7 +211,7 @@ function GuestHome() {
       <h1 className="px-5 mt-7 text-[32px] leading-[1.12] tracking-[-0.025em] font-normal">
         Setiap anak berhak tumbuh sepenuhnya <span className="anim-wiggle">🌱</span>
       </h1>
-      <p className="px-5 mt-2 text-[17px] text-mute leading-snug">Pantau pertumbuhan, milestone, dan imunisasi si Kecil dalam satu aplikasi, didampingi psikolog dan terapis anak FlourishCare.</p>
+      <p className="px-5 mt-2 text-[17px] text-mute leading-snug">Pantau kehamilan, pertumbuhan, milestone, imunisasi, dan skrining si Kecil dalam satu aplikasi, didampingi psikolog dan terapis anak FlourishCare.</p>
 
       <div className="mx-5 mt-6 rounded-[28px] bg-orange-gradient text-white p-5 shadow-orange relative overflow-hidden">
         <span className="absolute -right-10 -top-12 w-44 h-44 rounded-full bg-white/10" aria-hidden />
@@ -231,7 +239,7 @@ function GuestHome() {
         </div>
         <motion.div className="grid grid-cols-2 gap-3 px-5" variants={listContainer} initial="hidden" animate="show">
           {GUEST_FEATURES.map((f) => (
-            <FeatureCard key={f.key} feature={f} onOpen={() => nav.push(f.route)} />
+            <FeatureCard key={f.key} feature={f} onOpen={() => (f.tab ? nav.setTab(f.tab) : f.route && nav.push(f.route))} />
           ))}
         </motion.div>
         <TeamSection />
@@ -244,21 +252,83 @@ function GuestHome() {
   );
 }
 
+/** Home for a pregnancy profile */
+function PregnancyHome({ child }: { child: Child }) {
+  const nav = useNav();
+  const { profile, unreadCount, parentVariant } = useStore();
+  const s = pregnancyStatus(child);
+  const features: Feature[] = [
+    { key: 'track', title: 'Pantau Kehamilan', status: `Minggu ke-${s.weeks}, ${countdownLabel(s.daysToHpl)}`, icon: Baby, tab: 'track', hero: true },
+    { key: 'qa', title: 'Tanya Ahli', status: 'Dijawab psikolog & terapis', icon: MessageCircleHeart, route: { name: 'qa' } },
+    { key: 'library', title: 'Edukasi', status: 'Bacaan dari tim ahli', icon: BookOpen, route: { name: 'library' } },
+    { key: 'booking', title: 'Booking Klinik', status: 'Konsultasi & kelas', icon: CalendarCheck, route: { name: 'booking' } },
+  ];
+  return (
+    <Screen title="Beranda" hideNav largeTitle={false} withTabBar bottomSpacer={false}>
+      <div className="px-5 pt-3 flex items-center justify-between gap-3">
+        <button className="flex items-center gap-3 min-w-0 text-left" onClick={() => nav.setTab('account')}>
+          <ParentAvatar variant={parentVariant} size={46} />
+          <span className="min-w-0">
+            <span className="block text-[17px] leading-tight truncate">Hai, {firstName(profile?.fullName)}</span>
+            <span className="block text-[14px] text-mute mt-0.5 truncate">{formatDate(new Date(), 'day')}</span>
+          </span>
+        </button>
+        <IconButton icon={Bell} label="Notifikasi" badge={unreadCount > 0} onClick={() => nav.push({ name: 'notifications' })} />
+      </div>
+      <motion.h1 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="px-5 mt-6 text-[32px] leading-[1.12] tracking-[-0.025em] font-normal">
+        Si Kecil kini sebesar {s.week.size} <span className="anim-wiggle">🌱</span>
+      </motion.h1>
+      <Card className="mx-5 mt-5 overflow-hidden">
+        <motion.button whileTap={{ backgroundColor: '#FBF6F1' }} onClick={() => nav.setTab('track')} className="w-full flex items-center gap-3 p-4 text-left">
+          <ChildAvatar child={child} size={52} />
+          <span className="flex-1 min-w-0">
+            <span className="block text-[19px] leading-tight truncate">{child.name}</span>
+            <span className="block text-[14px] text-mute mt-0.5">Hamil {gestationLabel(s)} · HPL {formatDate(s.hpl)}</span>
+          </span>
+          <ArrowCorner />
+        </motion.button>
+        <div className="mx-4 mb-4 h-2 rounded-full bg-fill overflow-hidden">
+          <motion.div className="h-full bg-orange-gradient rounded-full" initial={{ width: 0 }} animate={{ width: `${s.progress * 100}%` }} transition={{ duration: 0.9 }} />
+        </div>
+      </Card>
+      <div className="mt-7 bg-white rounded-t-[32px] pt-6 hairline-t" style={{ paddingBottom: 'calc(var(--sab) + 112px)' }}>
+        <div className="px-5 mb-4">
+          <h2 className="text-[22px] font-normal leading-tight">Fitur</h2>
+          <p className="text-[15px] text-mute mt-0.5">Menemani Bunda sampai si Kecil lahir</p>
+        </div>
+        <motion.div className="grid grid-cols-2 gap-3 px-5" variants={listContainer} initial="hidden" animate="show">
+          {features.map((f) => (
+            <FeatureCard key={f.key} feature={f} onOpen={() => (f.tab ? nav.setTab(f.tab) : f.route && nav.push(f.route))} />
+          ))}
+        </motion.div>
+        <TeamSection />
+        <div className="mt-6">
+          <TipCard />
+        </div>
+      </div>
+    </Screen>
+  );
+}
+
 export default function HomeScreen() {
   const store = useStore();
   const nav = useNav();
   const { profile, activeChild, children, unreadCount, parentVariant } = store;
-  const { data, loading } = useChildData(activeChild?.id, store.isAuthed);
+  const unborn = !!activeChild?.isUnborn;
+  const { data, loading } = useChildData(activeChild?.id, store.isAuthed && !unborn);
+  const childAge = activeChild && !unborn ? ageInMonths(activeChild.birthDate) : 99;
+  const { logs } = useBabyLogs(activeChild?.id, store.isAuthed && !unborn && childAge < TRACKER_MAX_MONTHS);
   const [switcherOpen, setSwitcherOpen] = useState(false);
 
   const derived = useMemo(() => {
-    if (!activeChild) return null;
+    if (!activeChild || activeChild.isUnborn) return null;
     const age = ageInMonths(activeChild.birthDate);
-    const growthStatus = getWeightStatus(activeChild, data.growth);
+    const growthStatus = getGrowthStatus(activeChild, data.growth);
     const latest = latestRecord(data.growth);
-    const range = rangeForAge(age);
-    const progress = rangeProgress(data.milestones, range);
-    const late = lateMilestones(data.milestones, age);
+    const dev = devAgeMonths(activeChild);
+    const progress = progressAt(data.milestones, checkpointForAge(dev));
+    const late = lateMilestones(data.milestones, dev);
+    const dueScreenings = suggestions(activeChild, data.screenings).filter((x) => x.due);
     const schedule = buildVaccineSchedule(activeChild.birthDate, data.immunizations);
     const next = nextVaccine(schedule);
     const catchup = schedule.filter((v) => v.state === 'catchup');
@@ -274,15 +344,16 @@ export default function HomeScreen() {
     const upcoming = data.bookings
       .filter((b) => b.status !== 'cancelled' && new Date(b.scheduledAt) >= new Date(new Date().toDateString()))
       .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt))[0];
-    return { age, growthStatus, latest, progress, late, schedule, next, catchup, lastScreening, activities, doneToday, usedQuota, pending, upcoming };
+    return { age, growthStatus, latest, progress, late, schedule, next, catchup, lastScreening, activities, doneToday, usedQuota, pending, upcoming, dueScreenings };
   }, [activeChild, data, profile?.id]);
 
   if (!store.isAuthed) return <GuestHome />;
   if (!activeChild && profile?.isStaff) return <StaffHome />;
+  if (activeChild?.isUnborn) return <PregnancyHome child={activeChild} />;
   if (!activeChild || !derived) return null;
 
   const name = activeChild.name;
-  const { growthStatus, latest, progress, late, next, catchup, lastScreening, activities, doneToday, usedQuota, pending, upcoming } = derived;
+  const { age, growthStatus, latest, progress, late, next, catchup, lastScreening, activities, doneToday, usedQuota, pending, upcoming, dueScreenings } = derived;
 
   const first = firstName(name);
   let headline: React.ReactNode;
@@ -298,7 +369,7 @@ export default function HomeScreen() {
         {first} tumbuh baik minggu ini <span className="anim-wiggle">🎉</span>
       </>
     );
-  } else if (growthStatus.level === 'out_of_range') {
+  } else if (growthStatus.level === 'out_of_range' || growthStatus.level === 'concern') {
     headline = (
       <>
         Semangat menemani {first} tumbuh minggu ini <span className="anim-wiggle">🌱</span>
@@ -319,10 +390,13 @@ export default function HomeScreen() {
   if (!loading && noVaccineRecords && catchup.length) attention.push({ text: `Lengkapi riwayat imunisasi ${first} dari buku KIA`, route: { name: 'vaccine' } });
   else if (catchup.length) attention.push({ text: `${catchup.length} imunisasi perlu dikejar`, route: { name: 'vaccine' } });
   if (!loading && noMilestoneRecords && late.length) attention.push({ text: `Isi ceklis milestone ${first} sesuai usianya`, route: { name: 'milestone' } });
-  else if (late.length) attention.push({ text: `${late.length} milestone usia sebelumnya belum tercapai`, route: { name: 'milestone' } });
+  else if (late.length) attention.push({ text: `${late.length} milestone usia ${checkpointShortLabel(late[0].ageMonths)} belum dicentang`, route: { name: 'milestone' } });
   if (growthStatus.tone === 'warning' || growthStatus.tone === 'danger') attention.push({ text: growthStatus.title, route: { name: 'growth' } });
   if (lastScreening && !['normal', 'risiko_rendah'].includes(lastScreening.result)) {
-    attention.push({ text: `Hasil skrining terakhir: ${resultLabel(lastScreening.result).toLowerCase()}`, route: { name: 'screening' } });
+    attention.push({ text: `Hasil ${instrumentInfo(lastScreening.type).short} terakhir: ${resultLabel(lastScreening.result, lastScreening.type).toLowerCase()}`, route: { name: 'screening', reportId: lastScreening.id } });
+  }
+  if (!loading && dueScreenings.length) {
+    attention.unshift({ text: `${dueScreenings[0].reason} sudah waktunya`, route: { name: 'screening', start: dueScreenings[0].type } });
   }
 
   const features: Feature[] = [
@@ -344,17 +418,21 @@ export default function HomeScreen() {
     {
       key: 'milestone',
       title: 'Milestone',
-      status: noMilestoneRecords ? 'Mulai isi ceklis' : late.length ? `${late.length} belum tercapai` : `${progress.done} dari ${progress.total} tercapai`,
+      status: noMilestoneRecords ? 'Mulai isi ceklis' : late.length ? `${late.length} belum dicentang` : `${progress.done} dari ${progress.total} tercapai`,
       icon: Footprints,
       route: { name: 'milestone' },
     },
     {
       key: 'screening',
       title: 'Skrining Dini',
-      status: lastScreening ? `Terakhir: ${resultLabel(lastScreening.result).toLowerCase()}` : 'Belum pernah skrining',
+      status: dueScreenings.length ? `${dueScreenings.length} skrining sudah waktunya` : lastScreening ? `Terakhir: ${resultLabel(lastScreening.result, lastScreening.type).toLowerCase()}` : 'Sesuai usia si Kecil',
       icon: ClipboardCheck,
-      route: { name: 'screening' },
+      tab: 'screen',
     },
+    { key: 'journal', title: 'Jurnal & Album', status: 'Simpan momen dan foto', icon: BookHeart, route: { name: 'journal' } },
+    age < TRACKER_MAX_MONTHS
+      ? { key: 'babylog', title: 'Catatan Harian', status: 'Menyusu, tidur, popok', icon: Milk, route: { name: 'babylog' } }
+      : { key: 'child', title: 'Profil Kesehatan', status: 'Alergi dan riwayat', icon: HeartPulse, route: { name: 'child' } },
     {
       key: 'stimulasi',
       title: 'Stimulasi',
@@ -416,7 +494,7 @@ export default function HomeScreen() {
           className="w-full flex items-center gap-3 p-4 text-left"
           aria-label={`Buka profil ${name}`}
         >
-          <KidAvatar gender={activeChild.gender} size={52} />
+          <ChildAvatar child={activeChild} size={52} />
           <span className="flex-1 min-w-0">
             <span className="block text-[19px] leading-tight truncate">{name}</span>
             <span className="block text-[14px] text-mute mt-0.5">{ageLabel(activeChild.birthDate)}</span>
@@ -444,11 +522,18 @@ export default function HomeScreen() {
             onClick={() => setSwitcherOpen(true)}
             className="w-full flex items-center justify-center gap-1 py-2.5 text-[14px] text-brand-orange-deep bg-brand-orange-tint hairline-t"
           >
-            Ganti anak ({children.length})
+            Ganti profil ({children.length})
             <ChevronDown className="w-4 h-4" strokeWidth={2} />
           </button>
         )}
       </Card>
+
+      {/* Quick daily tracker for babies */}
+      {age < TRACKER_MAX_MONTHS && (
+        <div className="mx-5 mt-3">
+          <BabyQuickCard child={activeChild} logs={logs} onOpen={() => nav.push({ name: 'babylog' })} />
+        </div>
+      )}
 
       {/* Attention list */}
       {!loading && attention.length > 0 && (
@@ -478,7 +563,7 @@ export default function HomeScreen() {
         </div>
         <motion.div className="grid grid-cols-2 gap-3 px-5" variants={listContainer} initial="hidden" animate="show">
           {features.map((f) => (
-            <FeatureCard key={f.key} feature={f} onOpen={() => nav.push(f.route)} />
+            <FeatureCard key={f.key} feature={f} onOpen={() => (f.tab ? nav.setTab(f.tab) : f.route && nav.push(f.route))} />
           ))}
         </motion.div>
 

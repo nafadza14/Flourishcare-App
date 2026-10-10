@@ -9,6 +9,7 @@ import { ListGroup, ListRow } from '../components/ui/ListGroup';
 import { useToast } from '../components/ui/Toast';
 import { useStore } from '../lib/store';
 import { useChildData } from '../lib/useChildData';
+import UnbornGate from '../components/child/UnbornGate';
 import { buildVaccineSchedule, nextVaccine, VACCINE_STATE_LABEL, vaccineTiming, ageLabelForVaccine, type VaccineItem, type VaccineState } from '../lib/vaccines';
 import { ageLabel, firstName, formatDate, toISODate, todayISO } from '../lib/format';
 import { sendJSON } from '../api';
@@ -305,7 +306,7 @@ function PickerSheet({
 
 export default function VaccineScreen({ onBack }: { onBack?: () => void }) {
   const { activeChild } = useStore();
-  const { data, loading } = useChildData(activeChild?.id);
+  const { data, loading } = useChildData(activeChild?.id, !activeChild?.isUnborn);
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
   const [selected, setSelected] = useState<VaccineItem | null>(null);
@@ -313,11 +314,18 @@ export default function VaccineScreen({ onBack }: { onBack?: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const schedule = useMemo(
-    () => (activeChild ? buildVaccineSchedule(activeChild.birthDate, data.immunizations) : []),
+    () => (activeChild && !activeChild.isUnborn ? buildVaccineSchedule(activeChild.birthDate, data.immunizations) : []),
     [activeChild, data.immunizations],
   );
 
   if (!activeChild) return null;
+  if (activeChild.isUnborn) {
+    return (
+      <Screen title="Imunisasi" onBack={onBack}>
+        <UnbornGate name={activeChild.name} />
+      </Screen>
+    );
+  }
 
   const next = nextVaccine(schedule);
   const doneCount = schedule.filter((v) => v.state === 'done').length;

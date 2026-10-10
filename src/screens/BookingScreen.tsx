@@ -26,7 +26,8 @@ import Switch from '../components/ui/Switch';
 import Confetti from '../components/ui/Confetti';
 import { Field, OptionCard, TextArea } from '../components/ui/Field';
 import { Button, Card, Notice } from '../components/ui/primitives';
-import { PhotoAvatar, KidAvatar } from '../components/ui/Avatar';
+import { PhotoAvatar } from '../components/ui/Avatar';
+import ChildAvatar from '../components/child/ChildAvatar';
 import { useToast } from '../components/ui/Toast';
 import type { Booking } from '../types';
 import { useStore } from '../lib/store';
@@ -613,7 +614,7 @@ export default function BookingScreen({
             {step === 'client' && (
               <div className="space-y-4">
                 <Card className="p-4 flex items-center gap-3.5">
-                  <KidAvatar gender={activeChild.gender} size={48} />
+                  <ChildAvatar child={activeChild} size={48} />
                   <div className="min-w-0">
                     <div className="text-[17px]">{activeChild.name}</div>
                     <div className="text-[14px] text-mute">

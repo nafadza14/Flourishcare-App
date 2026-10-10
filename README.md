@@ -8,9 +8,22 @@ Tampilan bergaya aplikasi iOS: tab bar mengambang, navigasi push/pop dengan swip
 
 - Masuk dengan Google atau email (Supabase Auth). Satu akun dipakai bersama www.flourishcare.id dan book.flourishcare.id
 - Beranda dengan ringkasan anak, hal yang perlu diperhatikan, tim ahli FlourishCare, dan tips harian
-- Profil anak: berat, tinggi, usia, grafik pertumbuhan (standar WHO), milestone, riwayat skrining
-- Jadwal imunisasi (IDAI): catat satu per satu atau sekaligus dari buku KIA, foto bukti, cetak kartu
-- Skrining dini: KPSP, M-CHAT-R, deteksi keterlambatan bicara, laporan PDF
+- Navigasi 4 tab: Beranda, Pantau, Skrining, Akun. Semua fitur menyesuaikan usia profil yang dipilih
+- **Pantau** (pilar 1)
+  - Sampai 5 profil per akun, termasuk kehamilan. Foto profil, alergi, golongan darah, usia kehamilan saat lahir, riwayat kesehatan. Ganti profil satu ketuk
+  - Kehamilan: HPL dari HPHT (rumus Naegele) atau HPL dokter, perkembangan janin minggu demi minggu, hitung gerakan janin (mulai 28 minggu), jadwal periksa dan tanda bahaya (Buku KIA). Saat lahir, profil berubah menjadi profil anak dan data lahir menjadi titik pertama grafik
+  - Grafik pertumbuhan: WHO 2006 untuk 0 sampai 5 tahun, CDC 2000 untuk 5 sampai 8 tahun (anjuran IDAI). Indikator BB/PB atau BB/TB, PB/U atau TB/U, BB/U, LK/U, IMT/U. Kategori Permenkes No. 2 Tahun 2020, zona hijau, kuning, merah, perbandingan dengan pengukuran sebelumnya, usia koreksi untuk bayi prematur sampai 2 tahun
+  - Milestone CDC 2022 (2 bulan sampai 5 tahun) dalam 4 ranah, contoh dan ide stimulasi per kemampuan, pengingat lembut dan saran skrining bila tahap sebelumnya belum tercapai
+  - Imunisasi IDAI dengan foto buku KIA dan cetak kartu
+  - Jurnal dan album: foto dan video singkat (maks. 1 menit), kategori momen pertama, bisa dibagikan ke terapis
+  - Catatan harian 0 sampai 2 tahun: menyusu (timer kiri/kanan, botol, MPASI), tidur, popok, satu ketuk
+- **Skrining** (pilar 2), hasil langsung dan laporan PDF berlogo dengan ajakan booking (QR ke book.flourishcare.id)
+  - KPSP Kemenkes 2022 sesuai jadwal usia (hasil Sesuai, Meragukan, Penyimpangan)
+  - Tes Daya Dengar (0 sampai 12 bulan)
+  - Cek kemampuan bicara (IDAI, ASHA, CDC) dengan aktivitas stimulasi di rumah
+  - Tanda awal autisme (daftar pengamatan CDC). M-CHAT-R/F dilakukan bersama psikolog di klinik karena memerlukan lisensi
+  - Catatan sensori (pengamatan, bukan tes baku)
+  - Perhatian dan hiperaktivitas (GPPH, Kemenkes) untuk usia 3 tahun ke atas
 - Stimulasi harian sesuai usia dengan streak
 - Tanya Ahli: 3 pertanyaan gratis per bulan, dijawab psikolog dan terapis lewat Mode ahli (khusus akun staf)
 - Tim ahli diambil dari tabel `staff_profiles` (sama dengan halaman flourishcare.id/team)
@@ -30,7 +43,8 @@ Vite 6, React 19, TypeScript, Tailwind CSS v4, Motion (motion/react), lucide-rea
    - `http://localhost:3000/**` (untuk uji di komputer)
 3. **Supabase > Authentication > Providers > Google**: pastikan aktif (sudah dipakai www dan book).
 4. **Vercel > Project Settings > Environment Variables**: isi `SUPABASE_SECRET_KEY` (Supabase > Project Settings > API Keys > Secret keys). Lalu redeploy.
-5. Cek: buka app.flourishcare.id/api/supabase-status. Harus `"connected": true` dan `"tablesReady": true`. Kalau muncul `"Invalid API key"`, nilai secret key salah: lihat `secretKeyCheck` (format dan panjang key, tanpa membocorkan isinya), salin ulang memakai tombol salin di Supabase, simpan tanpa tanda kutip, lalu Redeploy.
+   Untuk database yang sudah berjalan, cukup jalankan `supabase/migrations/2026-10-10_pantau_skrining.sql` (kolom profil baru, tabel jurnal dan catatan harian). Foto dan video disimpan di bucket privat `app-media` yang dibuat otomatis oleh server.
+5. Cek: buka app.flourishcare.id/api/supabase-status. Harus `"connected": true`, `"tablesReady": true`, dan `"migrationNeeded": false`. Kalau muncul `"Invalid API key"`, nilai secret key salah: lihat `secretKeyCheck` (format dan panjang key, tanpa membocorkan isinya), salin ulang memakai tombol salin di Supabase, simpan tanpa tanda kutip, lalu Redeploy.
 
 Server API berjalan di region Singapura (`"regions": ["sin1"]` di `vercel.json`), dekat dengan pengguna dan database. Cek `dbMs.warm` di `/api/supabase-status`: di bawah sekitar 30 ms berarti server dan database berada di region yang sama.
 
@@ -73,7 +87,9 @@ src/
   components/ui/       komponen bergaya iOS (Screen, Sheet, Segmented, Switch, TabBar, Toast, grafik)
   components/sheets/   bottom sheet bersama
   lib/                 store, navigasi, auth Supabase, booking, logika pertumbuhan, milestone, vaksin, skrining
-  data/                tim klinik, harga layanan, data awal, skema SQL
+  data/                tim klinik, harga layanan, skema SQL, tabel acuan (WHO/CDC, KPSP, TDD, GPPH, milestone CDC, kehamilan)
 supabase/schema.sql    skema database aplikasi
+supabase/migrations/   perubahan skema per versi
 server.ts              API Express (juga dipakai Vercel lewat api/index.ts)
+server/features.ts     API jurnal, catatan harian, dan unggah media
 ```

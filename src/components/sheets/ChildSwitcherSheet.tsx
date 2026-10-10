@@ -1,8 +1,9 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { Check, Plus } from 'lucide-react';
+import { Baby, Check, Plus } from 'lucide-react';
 import Sheet from '../ui/Sheet';
-import { KidAvatar } from '../ui/Avatar';
+import ChildAvatar from '../child/ChildAvatar';
+import { profileAgeLabel } from '../../lib/pregnancy';
 import { useStore } from '../../lib/store';
 import { useNav } from '../../lib/nav';
 import { ageLabel } from '../../lib/format';
@@ -13,7 +14,7 @@ export default function ChildSwitcherSheet({ open, onClose }: { open: boolean; o
   const nav = useNav();
 
   return (
-    <Sheet open={open} onClose={onClose} title="Pilih si Kecil" subtitle="Data di aplikasi mengikuti anak yang dipilih.">
+    <Sheet open={open} onClose={onClose} title="Pilih profil" subtitle="Data di aplikasi mengikuti profil yang dipilih.">
       <div className="space-y-2.5 pt-1">
         {children.map((c) => {
           const active = c.id === activeChild?.id;
@@ -30,10 +31,10 @@ export default function ChildSwitcherSheet({ open, onClose }: { open: boolean; o
                 active ? 'bg-brand-orange-tint border-brand-orange' : 'bg-white border-line shadow-card'
               }`}
             >
-              <KidAvatar gender={c.gender} size={52} />
+              <ChildAvatar child={c} size={52} />
               <span className="flex-1 min-w-0">
                 <span className="block text-[18px] text-ink truncate">{c.name}</span>
-                <span className="block text-[14px] text-mute">{ageLabel(c.birthDate)}</span>
+                <span className="block text-[14px] text-mute">{profileAgeLabel(c, ageLabel)}</span>
               </span>
               {active && (
                 <span className="w-7 h-7 rounded-full bg-brand-orange text-white flex items-center justify-center">
@@ -44,20 +45,29 @@ export default function ChildSwitcherSheet({ open, onClose }: { open: boolean; o
           );
         })}
         {children.length < 5 && (
-          <motion.button
-            whileTap={{ scale: 0.98 }}
-            onClick={() => {
-              onClose();
-              window.setTimeout(() => nav.push({ name: 'onboarding' }), 180);
-            }}
-            className="w-full flex items-center gap-3.5 p-3.5 rounded-[22px] border border-dashed border-line-2 text-left text-ink-2"
-          >
-            <span className="w-[52px] h-[52px] rounded-full bg-fill flex items-center justify-center">
-              <Plus className="w-6 h-6" strokeWidth={1.8} />
-            </span>
-            <span className="text-[17px]">Tambah anak</span>
-          </motion.button>
+          <div className="grid grid-cols-2 gap-2.5">
+            {([
+              { mode: 'child' as const, label: 'Tambah anak', icon: Plus },
+              { mode: 'pregnancy' as const, label: 'Sedang hamil', icon: Baby },
+            ]).map((opt) => (
+              <motion.button
+                key={opt.mode}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => {
+                  onClose();
+                  window.setTimeout(() => nav.push({ name: 'onboarding', mode: opt.mode }), 180);
+                }}
+                className="flex items-center gap-2.5 p-3.5 rounded-[22px] border border-dashed border-line-2 text-left text-ink-2"
+              >
+                <span className="w-10 h-10 rounded-full bg-fill flex items-center justify-center shrink-0">
+                  <opt.icon className="w-5 h-5" strokeWidth={1.8} />
+                </span>
+                <span className="text-[16px] leading-tight">{opt.label}</span>
+              </motion.button>
+            ))}
+          </div>
         )}
+        {children.length >= 5 && <p className="text-[14px] text-mute text-center px-4">Maksimal 5 profil dalam satu akun.</p>}
       </div>
     </Sheet>
   );

@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { ArrowLeftRight, Baby, CircleDashed, ClipboardCheck, EllipsisVertical, Footprints, Mars, NotebookPen, Pencil, Plus, Ruler, Scale, Trash2, Venus } from 'lucide-react';
+import { ArrowLeftRight, Baby, CalendarHeart, CircleDashed, ClipboardCheck, Droplet, EllipsisVertical, Footprints, Mars, NotebookPen, Pencil, Plus, Ruler, Scale, ShieldAlert, Trash2, Venus } from 'lucide-react';
+import ChildAvatar from '../components/child/ChildAvatar';
+import { gestationLabel, pregnancyStatus } from '../lib/pregnancy';
 import Screen from '../components/ui/Screen';
 import Segmented from '../components/ui/Segmented';
 import Sheet from '../components/ui/Sheet';
-import { KidAvatar } from '../components/ui/Avatar';
 import { Button, Card, IconButton, Skeleton } from '../components/ui/primitives';
 import { ListGroup, ListRow } from '../components/ui/ListGroup';
 import { useToast } from '../components/ui/Toast';
@@ -43,7 +44,7 @@ export default function ChildProfileScreen({ onBack }: { onBack?: () => void }) 
   const { activeChild, children, refreshChildren } = useStore();
   const nav = useNav();
   const toast = useToast();
-  const { data, loading } = useChildData(activeChild?.id);
+  const { data, loading } = useChildData(activeChild?.id, !activeChild?.isUnborn);
   const [seg, setSeg] = useState<Seg>('growth');
   const [editOpen, setEditOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -56,7 +57,7 @@ export default function ChildProfileScreen({ onBack }: { onBack?: () => void }) 
   if (!activeChild) return null;
   const latest = latestRecord(data.growth);
   const age = ageInMonths(activeChild.birthDate);
-  const late = lateMilestones(data.milestones, age);
+  const late = data.milestones.length ? lateMilestones(data.milestones, age) : [];
 
   const removeChild = async () => {
     setDeleting(true);
@@ -72,6 +73,37 @@ export default function ChildProfileScreen({ onBack }: { onBack?: () => void }) 
       setDeleting(false);
     }
   };
+
+  if (activeChild.isUnborn) {
+    const p = pregnancyStatus(activeChild);
+    return (
+      <Screen title={`Profil ${firstName(activeChild.name)}`} subtitle={`Hamil ${gestationLabel(p)}`} onBack={onBack} withTabBar={!onBack}>
+        <div className="px-5 space-y-3">
+          <ListGroup className="!px-0">
+            <ListRow icon={CalendarHeart} title="HPL" value={formatDate(p.hpl)} />
+            <ListRow icon={CalendarHeart} iconTone="gray" title="HPHT" value={formatDate(p.hpht)} />
+          </ListGroup>
+          <Button block icon={Pencil} onClick={() => setEditOpen(true)}>
+            Perbarui profil kehamilan
+          </Button>
+          <Button block variant="danger" icon={Trash2} onClick={() => setMenuOpen(true)}>
+            Hapus profil
+          </Button>
+        </div>
+        <EditChildSheet open={editOpen} onClose={() => setEditOpen(false)} child={activeChild} />
+        <Sheet open={menuOpen} onClose={() => setMenuOpen(false)} title="Hapus profil kehamilan?" subtitle="Semua catatan di profil ini akan dihapus permanen.">
+          <div className="grid grid-cols-2 gap-2.5 pt-2">
+            <Button variant="secondary" onClick={() => setMenuOpen(false)}>
+              Batal
+            </Button>
+            <Button variant="danger" loading={deleting} onClick={removeChild}>
+              Hapus
+            </Button>
+          </div>
+        </Sheet>
+      </Screen>
+    );
+  }
 
   return (
     <Screen
@@ -95,7 +127,7 @@ export default function ChildProfileScreen({ onBack }: { onBack?: () => void }) 
           transition={{ type: 'spring', stiffness: 260, damping: 20 }}
           className="anim-float shrink-0"
         >
-          <KidAvatar gender={activeChild.gender} size={112} bg={false} />
+          <ChildAvatar child={activeChild} size={112} bg={false} />
         </motion.div>
         <div className="grid grid-cols-2 gap-x-2.5 gap-y-4 flex-1 min-w-0">
           {loading ? (
@@ -164,7 +196,7 @@ export default function ChildProfileScreen({ onBack }: { onBack?: () => void }) 
               <div className="space-y-4">
                 {late.length > 0 && (
                   <div className="rounded-[20px] bg-brand-orange-tint border border-brand-orange/30 p-4 text-[15px] text-ink-2">
-                    {late.length} milestone usia sebelumnya belum tercapai. Buka ceklis untuk memperbarui atau mulai skrining.
+                    {late.length} milestone usia sebelumnya belum dicentang. Buka ceklis untuk memperbarui atau mulai skrining.
                   </div>
                 )}
                 <MilestoneSummary milestones={data.milestones} age={age} />
@@ -187,14 +219,21 @@ export default function ChildProfileScreen({ onBack }: { onBack?: () => void }) 
               <div className="space-y-3">
                 <ListGroup className="!px-0">
                   <ListRow icon={Baby} title="Tanggal lahir" value={formatDate(activeChild.birthDate)} />
-                  <ListRow icon={CircleDashed} iconTone="gray" title="Lahir prematur" value={activeChild.isPremature ? 'Ya' : 'Tidak'} />
+                  <ListRow
+                    icon={CircleDashed}
+                    iconTone="gray"
+                    title="Lahir prematur"
+                    value={activeChild.isPremature ? (activeChild.gestationalWeeks ? `Ya, ${activeChild.gestationalWeeks} minggu` : 'Ya') : 'Tidak'}
+                  />
+                  <ListRow icon={ShieldAlert} iconTone="red" title="Alergi" value={activeChild.allergies?.trim() || 'Tidak ada'} />
+                  <ListRow icon={Droplet} iconTone="gray" title="Golongan darah" value={activeChild.bloodType || 'Belum diisi'} />
                 </ListGroup>
                 <Card className="p-4">
                   <div className="flex items-center gap-2 text-[14px] text-mute">
                     <NotebookPen className="w-4 h-4" /> Catatan kesehatan
                   </div>
                   <p className="text-[16px] leading-relaxed text-ink-2 mt-2 whitespace-pre-line">
-                    {activeChild.medicalNotes?.trim() || 'Belum ada catatan. Tambahkan alergi, riwayat lahir, atau hal penting lain.'}
+                    {activeChild.medicalNotes?.trim() || 'Belum ada catatan. Tambahkan riwayat lahir, rawat inap, obat rutin, atau hal penting lain.'}
                   </p>
                   <Button size="sm" variant="soft" icon={Pencil} className="mt-3" onClick={() => setEditOpen(true)}>
                     Ubah catatan
@@ -238,7 +277,7 @@ export default function ChildProfileScreen({ onBack }: { onBack?: () => void }) 
             {children.length > 1 && (
               <ListRow
                 icon={ArrowLeftRight}
-                title="Ganti anak"
+                title="Ganti profil"
                 onClick={() => {
                   setMenuOpen(false);
                   window.setTimeout(() => setSwitcherOpen(true), 200);
