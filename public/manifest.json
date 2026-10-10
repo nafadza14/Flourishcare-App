@@ -1,4 +1,5 @@
 {
+  "id": "/",
   "short_name": "FlourishCare",
   "name": "FlourishCare: Aplikasi Tumbuh Kembang Anak",
   "description": "#1 Aplikasi Tumbuh Kembang Anak di Indonesia. Pantau pertumbuhan, milestone, imunisasi, dan skrining dini si Kecil, didampingi psikolog dan terapis anak FlourishCare.",
@@ -33,5 +34,12 @@
     "health",
     "medical",
     "lifestyle"
-  ]
+  ],
+  "related_applications": [
+    {
+      "platform": "webapp",
+      "url": "https://app.flourishcare.id/manifest.json"
+    }
+  ],
+  "prefer_related_applications": false
 }

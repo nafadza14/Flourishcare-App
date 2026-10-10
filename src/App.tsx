@@ -24,6 +24,7 @@ import NotificationsScreen from './screens/NotificationsScreen';
 import AuthScreen from './screens/AuthScreen';
 import OnboardingScreen from './screens/OnboardingScreen';
 import NewPasswordSheet from './components/sheets/NewPasswordSheet';
+import InstallBanner, { DesktopInstallPanel } from './components/InstallBanner';
 import { takeAuthIntent } from './lib/supabase';
 
 const TAB_KEYS: TabKey[] = ['home', 'child', 'vaccine', 'account'];
@@ -220,6 +221,8 @@ function Shell() {
             );
           })}
         {!booting && <TabBar active={nav.tab} onChange={nav.setTab} />}
+        {/* "Pasang FlourishCare di HP" (covered automatically when a screen is pushed) */}
+        <InstallBanner enabled={!booting && !needsOnboarding && !loadFailed} />
         <motion.div
           className="absolute inset-0 bg-[#231B16] pointer-events-none z-50"
           initial={false}
@@ -274,7 +277,7 @@ function Root() {
 export default function App() {
   return (
     <MotionConfig reducedMotion="user">
-      <PhoneShell>
+      <PhoneShell aside={<DesktopInstallPanel />}>
         <ToastProvider>
           <StoreProvider>
             <Root />

@@ -73,12 +73,13 @@ function useFrameZoom() {
   return zoom;
 }
 
-export default function PhoneShell({ children }: { children: React.ReactNode }) {
+export default function PhoneShell({ children, aside }: { children: React.ReactNode; /** Shown beside the frame on wide screens */ aside?: React.ReactNode }) {
   const [portalEl, setPortalEl] = useState<HTMLElement | null>(null);
   const zoom = useFrameZoom();
 
   return (
-    <div className="min-h-[100dvh] w-full flex items-center justify-center md:py-6 bg-peach md:bg-[radial-gradient(120%_80%_at_50%_0%,#FDEBD8_0%,#FBE2C8_55%,#F6D3B1_100%)]">
+    <div className="min-h-[100dvh] w-full flex items-center justify-center md:py-6 bg-peach md:bg-[radial-gradient(120%_80%_at_50%_0%,#FDEBD8_0%,#FBE2C8_55%,#F6D3B1_100%)] xl:grid xl:grid-cols-[1fr_auto_1fr] xl:gap-14">
+      {aside && <div className="hidden xl:flex justify-end items-center">{aside}</div>}
       <div
         className="phone relative w-full h-[100dvh] md:w-[402px] md:h-[874px] md:rounded-[66px] md:p-[11px] md:bg-[linear-gradient(160deg,#FFFFFF_0%,#F3EEE9_60%,#E9E2DB_100%)] md:shadow-[0_40px_80px_-20px_rgba(120,70,30,0.35),0_0_0_1px_rgba(120,70,30,0.08)]"
         style={zoom < 1 ? { zoom } : undefined}
@@ -91,6 +92,7 @@ export default function PhoneShell({ children }: { children: React.ReactNode }) 
           <div className="hidden md:block absolute bottom-[8px] left-1/2 -translate-x-1/2 w-[136px] h-[5px] rounded-full bg-ink/85 z-[90] pointer-events-none" />
         </div>
       </div>
+      {aside && <div className="hidden xl:block" aria-hidden />}
     </div>
   );
 }

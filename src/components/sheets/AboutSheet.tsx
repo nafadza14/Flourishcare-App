@@ -15,7 +15,7 @@ interface DbStatus {
   hint?: string;
 }
 
-export const APP_VERSION = '1.4.0';
+export const APP_VERSION = '1.5.0';
 
 /** About the app. The database panel is only shown to clinic staff (setup help). */
 export default function AboutSheet({ open, onClose, showAdmin = false }: { open: boolean; onClose: () => void; showAdmin?: boolean }) {

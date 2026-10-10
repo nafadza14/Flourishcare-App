@@ -11,6 +11,8 @@ import { ListGroup, ListRow } from '../components/ui/ListGroup';
 import { KidAvatar, ParentAvatar } from '../components/ui/Avatar';
 import { useToast } from '../components/ui/Toast';
 import AboutSheet, { APP_VERSION } from '../components/sheets/AboutSheet';
+import InstallGuideSheet from '../components/sheets/InstallGuideSheet';
+import { useInstall } from '../lib/install';
 import type { NotificationPreferences, UserProfile } from '../types';
 import { useStore } from '../lib/store';
 import { useNav } from '../lib/nav';
@@ -89,6 +91,8 @@ export default function AccountScreen() {
   const [editOpen, setEditOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
+  const [installOpen, setInstallOpen] = useState(false);
+  const install = useInstall();
 
   useEffect(() => {
     getJSON<NotificationPreferences | null>('/api/preferences', null).then(setPrefs);
@@ -191,6 +195,20 @@ export default function AccountScreen() {
       </ListGroup>
 
       <ListGroup title="Lainnya" className="mt-7">
+        {!install.installed && (
+          <ListRow
+            icon={Smartphone}
+            title={install.device.mobile ? 'Pasang di layar utama' : 'Pakai di HP'}
+            subtitle={install.device.mobile ? 'Buka FlourishCare sekali ketuk' : 'Scan kode QR dengan kamera HP'}
+            onClick={async () => {
+              if (install.device.mobile && install.canPrompt) {
+                const outcome = await install.promptInstall();
+                if (outcome !== 'unavailable') return;
+              }
+              setInstallOpen(true);
+            }}
+          />
+        )}
         <ListRow icon={Info} iconTone="gray" title="Tentang FlourishCare" onClick={() => setAboutOpen(true)} />
         <ListRow icon={LogOut} iconTone="red" title="Keluar" destructive chevron={false} onClick={() => setLogoutOpen(true)} />
       </ListGroup>
@@ -200,6 +218,7 @@ export default function AccountScreen() {
       </motion.p>
 
       <EditProfileSheet open={editOpen} onClose={() => setEditOpen(false)} profile={profile} />
+      <InstallGuideSheet open={installOpen} onClose={() => setInstallOpen(false)} />
       <AboutSheet open={aboutOpen} onClose={() => setAboutOpen(false)} showAdmin={!!profile?.isStaff} />
       <Sheet open={logoutOpen} onClose={() => setLogoutOpen(false)} title="Keluar dari akun?" subtitle="Data si Kecil tetap tersimpan dan muncul lagi saat Ayah Bunda masuk kembali.">
         <div className="grid grid-cols-2 gap-2.5 pt-2">

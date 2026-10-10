@@ -16,7 +16,7 @@ Tampilan bergaya aplikasi iOS: tab bar mengambang, navigasi push/pop dengan swip
 - Tim ahli diambil dari tabel `staff_profiles` (sama dengan halaman flourishcare.id/team)
 - Booking klinik membuka book.flourishcare.id. Alur booking di dalam aplikasi tetap ada dan bisa diaktifkan lagi
 - Notifikasi dan preferensi pengingat
-- PWA: bisa dipasang ke layar utama
+- PWA: bisa dipasang ke layar utama. Pengunjung web melihat kartu "Pasang FlourishCare di HP": Android cukup sekali ketuk, iPhone mendapat panduan Bagikan > Tambah ke Layar Utama, pengunjung dari Instagram/TikTok diarahkan membuka di Safari/Chrome, dan di komputer tampil kode QR. Kalau ditutup, muncul lagi setelah 3, 7, lalu 30 hari (`src/lib/install.ts`)
 
 ## Teknologi
 
