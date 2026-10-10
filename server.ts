@@ -460,6 +460,14 @@ const PORT = Number(process.env.PORT) || 3000;
 
   const tokenCache = new Map<string, { user: AuthUser; until: number }>();
 
+  function jwtAlg(token: string): string {
+    try {
+      return String(JSON.parse(Buffer.from(token.split('.')[0], 'base64url').toString('utf8')).alg || '');
+    } catch {
+      return '';
+    }
+  }
+
   function jwtExpiry(token: string): number | null {
     try {
       const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
@@ -477,6 +485,26 @@ const PORT = Number(process.env.PORT) || 3000;
     if (token.split('.').length === 3) {
       const exp = jwtExpiry(token);
       if (exp && exp < Date.now()) return null;
+      // Asymmetric signing keys (RS256/ES256) can be verified here without a round trip to Supabase
+      if (jwtAlg(token) !== 'HS256') {
+        try {
+          const { data: claimData, error: claimError } = await supabaseAuth.auth.getClaims(token);
+          const claims = claimData?.claims as Record<string, any> | undefined;
+          if (!claimError && claims?.sub && claims.role === 'authenticated') {
+            const user: AuthUser = {
+              id: String(claims.sub),
+              email: String(claims.email || '').toLowerCase(),
+              meta: { ...(claims.user_metadata || {}) },
+              accessToken: token,
+            };
+            if (tokenCache.size > 1000) tokenCache.clear();
+            tokenCache.set(token, { user, until: Math.min(exp ?? Infinity, Date.now() + 5 * 60 * 1000) });
+            return user;
+          }
+        } catch {
+          /* fall back to asking Supabase below */
+        }
+      }
       const { data, error } = await supabaseAuth.auth.getUser(token);
       if (error || !data?.user) {
         const status = (error as any)?.status;
@@ -1254,9 +1282,19 @@ const PORT = Number(process.env.PORT) || 3000;
 
   // Supabase Connection Health Status (no secrets in the response)
   app.get('/api/supabase-status', async (_req: Request, res: Response) => {
-    const base = { project: SUPABASE_PROJECT_REF, secretKey: !!SUPABASE_SECRET_KEY, secretKeyCheck: describeSecretKey(SUPABASE_SECRET_KEY, secretEnv.cleaned) };
+    const base: Record<string, unknown> = {
+      project: SUPABASE_PROJECT_REF,
+      serverRegion: process.env.VERCEL_REGION || 'local',
+      secretKey: !!SUPABASE_SECRET_KEY,
+      secretKeyCheck: describeSecretKey(SUPABASE_SECRET_KEY, secretEnv.cleaned),
+    };
     try {
+      const t0 = Date.now();
       const { error } = await supabase.from('app_profiles').select('id').limit(1);
+      // Second query reuses the connection: close to the pure distance to the database
+      const t1 = Date.now();
+      if (!error) await supabase.from('app_profiles').select('id').limit(1);
+      base.dbMs = { first: t1 - t0, warm: Date.now() - t1 };
       if (error) {
         const missing = isTableMissingError(error);
         return res.json({
@@ -1426,7 +1464,8 @@ const PORT = Number(process.env.PORT) || 3000;
     const meta = user.meta || {};
     const providerName = String(meta.full_name || meta.name || '').trim();
     const phone = localPhone(meta.whatsapp || meta.phone || '');
-    const existing = await findProfile(user.id);
+    // Profile and staff status are independent: fetch both at once
+    const [existing, staff] = await Promise.all([findProfile(user.id), getStaffInfo(user)]);
     let profile: UserProfile;
     let isNew = false;
 
@@ -1457,7 +1496,6 @@ const PORT = Number(process.env.PORT) || 3000;
       profile = Object.keys(patch).length ? await updateProfile(user.id, patch) : existing;
     }
 
-    const staff = await getStaffInfo(user);
     res.json({
       user: { ...profile, isStaff: staff.isStaff, avatarUrl: meta.avatar_url || meta.picture || undefined },
       isNew,
@@ -1466,8 +1504,7 @@ const PORT = Number(process.env.PORT) || 3000;
 
   app.get('/api/profile', async (req: Request, res: Response) => {
     const user = getAuthUser(req);
-    const prof = await getProfile(getUserId(req));
-    const staff = await getStaffInfo(user);
+    const [prof, staff] = await Promise.all([getProfile(getUserId(req)), getStaffInfo(user)]);
     res.json({ ...prof, isStaff: staff.isStaff, avatarUrl: user?.meta?.avatar_url || user?.meta?.picture || undefined });
   });
 

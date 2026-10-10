@@ -53,6 +53,19 @@ export function hasStoredSession(): boolean {
   return !!safeGet(localStorage, STORAGE_KEY);
 }
 
+/** User id of the session saved on this device, read without loading the Supabase library. */
+export function storedSessionUserId(): string | null {
+  try {
+    const raw = safeGet(localStorage, STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const id = parsed?.user?.id ?? parsed?.currentSession?.user?.id;
+    return typeof id === 'string' ? id : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getSession(): Promise<Session | null> {
   if (!hasStoredSession() && !clientPromise) return null;
   const sb = await getSupabase();

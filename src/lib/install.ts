@@ -2,8 +2,10 @@ import { useEffect, useReducer, useState } from 'react';
 
 /**
  * Add-to-home-screen support.
- *  - Android Chrome, Edge, Samsung Internet: the browser fires `beforeinstallprompt`,
- *    we keep it and show our own banner, then call prompt() when the parent taps "Pasang".
+ *  - Android Chrome, Edge, Samsung Internet: the browser shows its own install prompt
+ *    ("Tambahkan ke layar utama" / "Instal aplikasi"). We keep the event so the "Pasang"
+ *    buttons can open the same browser dialog later, and only show our own card on a
+ *    later visit when the parent ignored the browser's prompt.
  *  - iPhone and iPad: there is no install API, so we show the steps (Bagikan > Tambah ke Layar Utama).
  *  - In-app browsers (Instagram, Facebook, TikTok): installing is impossible there,
  *    so we ask the parent to open the link in Safari or Chrome first.
@@ -20,6 +22,20 @@ export type InstallMode = 'native' | 'ios' | 'android-manual' | 'in-app' | 'none
 /** Which instructions the guide sheet shows */
 export type GuideMode = 'ios' | 'android-manual' | 'in-app' | 'desktop';
 
+/** When the browser first offered its own install prompt on this device */
+const NATIVE_SEEN_KEY = 'fc_native_install_seen';
+/** Days the browser's own prompt gets before our card offers the same thing */
+const NATIVE_GRACE_DAYS = 3;
+
+function nativePromptOfferedBefore(days: number): boolean {
+  try {
+    const at = Number(localStorage.getItem(NATIVE_SEEN_KEY));
+    return !!at && Date.now() - at > days * 86400000;
+  } catch {
+    return false;
+  }
+}
+
 let deferredPrompt: BeforeInstallPromptEvent | null = null;
 let installedThisVisit = false;
 const listeners = new Set<() => void>();
@@ -28,8 +44,13 @@ const emit = () => listeners.forEach((fn) => fn());
 if (typeof window !== 'undefined') {
   // Registered when this module loads (imported from main.tsx), so an early event is never missed
   window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault(); // show our own banner instead of the browser's mini bar
+    // No preventDefault(): the browser shows its own install prompt automatically.
     deferredPrompt = e as BeforeInstallPromptEvent;
+    try {
+      if (!localStorage.getItem(NATIVE_SEEN_KEY)) localStorage.setItem(NATIVE_SEEN_KEY, String(Date.now()));
+    } catch {
+      /* ignore */
+    }
     emit();
   });
   window.addEventListener('appinstalled', () => {
@@ -185,7 +206,8 @@ export function useInstall() {
   let mode: InstallMode = 'none';
   if (!installed) {
     if (device.inApp) mode = 'in-app';
-    else if (canPrompt && device.mobile) mode = 'native';
+    // The browser shows its own install prompt first; our card is only a reminder on a later visit
+    else if (canPrompt && device.mobile) mode = nativePromptOfferedBefore(NATIVE_GRACE_DAYS) ? 'native' : 'none';
     else if (device.ios) mode = 'ios';
     // Chrome on Android always fires the event when the app can be installed.
     // No event usually means it is already installed, so stay quiet.
