@@ -8,7 +8,6 @@ export const MILESTONES_SEED: MilestoneReference[] = [
     ageMonthMin: 0,
     ageMonthMax: 3,
     description: 'Mengangkat kepala setinggi 45 derajat ketika ditengkurapkan.',
-    exampleVideoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
   },
   {
     id: 'm_03_mh_1',
@@ -16,7 +15,6 @@ export const MILESTONES_SEED: MilestoneReference[] = [
     ageMonthMin: 0,
     ageMonthMax: 3,
     description: 'Menggerakkan lengan dan kaki secara bersamaan dan aktif, menggenggam mainan yang disentuhkan ke telapak tangan.',
-    exampleVideoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
   },
   {
     id: 'm_03_b_1',
@@ -24,15 +22,13 @@ export const MILESTONES_SEED: MilestoneReference[] = [
     ageMonthMin: 0,
     ageMonthMax: 3,
     description: 'Bereaksi terhadap suara keras dengan terkejut, mengeluarkan suara "ooh" atau "aah" (cooing).',
-    exampleVideoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
   },
   {
     id: 'm_03_se_1',
     domain: 'sosial_emosional',
     ageMonthMin: 0,
     ageMonthMax: 3,
-    description: 'Tersenyum secara spontan ketika diajak bicara atau melihat wajah orang tua (social smile).',
-    exampleVideoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
+    description: 'Tersenyum secara spontan ketika diajak bicara atau melihat wajah orang tua (social smile).'
   },
 
   // 4 - 6 Bulan
@@ -42,7 +38,6 @@ export const MILESTONES_SEED: MilestoneReference[] = [
     ageMonthMin: 4,
     ageMonthMax: 6,
     description: 'Tengkurap dan telentang sendiri tanpa bantuan (guling-guling).',
-    exampleVideoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
   },
   {
     id: 'm_46_mh_1',
@@ -50,7 +45,6 @@ export const MILESTONES_SEED: MilestoneReference[] = [
     ageMonthMin: 4,
     ageMonthMax: 6,
     description: 'Meraih dan memegang mainan atau benda yang ada di dekatnya.',
-    exampleVideoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
   },
   {
     id: 'm_46_b_1',
@@ -58,7 +52,6 @@ export const MILESTONES_SEED: MilestoneReference[] = [
     ageMonthMin: 4,
     ageMonthMax: 6,
     description: 'Mulai mengoceh suara satu suku kata berulang seperti "ba-ba", "da-da" (babbling).',
-    exampleVideoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
   },
   {
     id: 'm_46_se_1',
@@ -66,7 +59,6 @@ export const MILESTONES_SEED: MilestoneReference[] = [
     ageMonthMin: 4,
     ageMonthMax: 6,
     description: 'Tertawa keras jika diajak bercanda, mengekspresikan rasa senang atau tidak senang.',
-    exampleVideoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
   },
 
   // 7 - 9 Bulan
@@ -76,7 +68,6 @@ export const MILESTONES_SEED: MilestoneReference[] = [
     ageMonthMin: 7,
     ageMonthMax: 9,
     description: 'Duduk tegak sendiri tanpa disangga punggungnya.',
-    exampleVideoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
   },
   {
     id: 'm_79_mh_1',
@@ -84,7 +75,6 @@ export const MILESTONES_SEED: MilestoneReference[] = [
     ageMonthMin: 7,
     ageMonthMax: 9,
     description: 'Memindahkan benda atau mainan dari tangan kanan ke tangan kiri atau sebaliknya.',
-    exampleVideoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
   },
   {
     id: 'm_79_b_1',
@@ -92,7 +82,6 @@ export const MILESTONES_SEED: MilestoneReference[] = [
     ageMonthMin: 7,
     ageMonthMax: 9,
     description: 'Memahami kata "tidak" secara kontekstual, merespons ketika namanya dipanggil.',
-    exampleVideoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
   },
   {
     id: 'm_79_se_1',
@@ -100,7 +89,6 @@ export const MILESTONES_SEED: MilestoneReference[] = [
     ageMonthMin: 7,
     ageMonthMax: 9,
     description: 'Mulai cemas terhadap orang asing (stranger anxiety) dan mencari kenyamanan di dekat ibu.',
-    exampleVideoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
   },
 
   // 10 - 12 Bulan
@@ -110,7 +98,6 @@ export const MILESTONES_SEED: MilestoneReference[] = [
     ageMonthMin: 10,
     ageMonthMax: 12,
     description: 'Berdiri tegak dengan berpegangan pada furnitur, melangkah beberapa langkah sambil merambat.',
-    exampleVideoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
   },
   {
     id: 'm_1012_mh_1',
@@ -118,7 +105,6 @@ export const MILESTONES_SEED: MilestoneReference[] = [
     ageMonthMin: 10,
     ageMonthMax: 12,
     description: 'Menjepit benda kecil menggunakan ibu jari dan jari telunjuk (pincer grasp).',
-    exampleVideoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
   },
   {
     id: 'm_1012_b_1',
@@ -126,7 +112,6 @@ export const MILESTONES_SEED: MilestoneReference[] = [
     ageMonthMin: 10,
     ageMonthMax: 12,
     description: 'Mengucapkan 1-2 kata bermakna selain "mama" atau "papa" (seperti "mam", "num").',
-    exampleVideoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
   },
   {
     id: 'm_1012_se_1',
@@ -134,7 +119,6 @@ export const MILESTONES_SEED: MilestoneReference[] = [
     ageMonthMin: 10,
     ageMonthMax: 12,
     description: 'Melambaikan tangan ("da-da") atau tos tangan saat diminta, bertepuk tangan (clapping).',
-    exampleVideoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
   },
 
   // 13 - 18 Bulan
@@ -144,7 +128,6 @@ export const MILESTONES_SEED: MilestoneReference[] = [
     ageMonthMin: 13,
     ageMonthMax: 18,
     description: 'Berjalan tegak sendiri tanpa disangga atau dipapah.',
-    exampleVideoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
   },
   {
     id: 'm_1318_mh_1',
@@ -152,7 +135,6 @@ export const MILESTONES_SEED: MilestoneReference[] = [
     ageMonthMin: 13,
     ageMonthMax: 18,
     description: 'Menumpuk minimal 2 balok kayu kecil ke atas tanpa jatuh, mencoret-coret kertas secara bebas.',
-    exampleVideoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
   },
   {
     id: 'm_1318_b_1',
@@ -160,7 +142,6 @@ export const MILESTONES_SEED: MilestoneReference[] = [
     ageMonthMin: 13,
     ageMonthMax: 18,
     description: 'Menunjuk anggota tubuh atau objek yang ditanyakan oleh orang dewasa, menguasai 6-10 kosakata bermakna.',
-    exampleVideoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
   },
   {
     id: 'm_1318_se_1',
@@ -168,7 +149,6 @@ export const MILESTONES_SEED: MilestoneReference[] = [
     ageMonthMin: 13,
     ageMonthMax: 18,
     description: 'Menunjukkan kasih sayang kepada mainan (memeluk boneka) atau mengajak orang tua bermain bersama.',
-    exampleVideoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
   },
 
   // 19 - 24 Bulan
@@ -178,7 +158,6 @@ export const MILESTONES_SEED: MilestoneReference[] = [
     ageMonthMin: 19,
     ageMonthMax: 24,
     description: 'Berlari kencang, menendang bola ke arah depan tanpa jatuh terpeleset.',
-    exampleVideoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
   },
   {
     id: 'm_1924_mh_1',
@@ -186,7 +165,6 @@ export const MILESTONES_SEED: MilestoneReference[] = [
     ageMonthMin: 19,
     ageMonthMax: 24,
     description: 'Menyusun menara berisi 4-6 balok kecil, menuangkan air dari wadah ke wadah lain tanpa tumpah banyak.',
-    exampleVideoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
   },
   {
     id: 'm_1924_b_1',
@@ -194,7 +172,6 @@ export const MILESTONES_SEED: MilestoneReference[] = [
     ageMonthMin: 19,
     ageMonthMax: 24,
     description: 'Menggabungkan 2 kata menjadi kalimat sederhana (misal: "mau mimi", "mama bobo", "minta roti").',
-    exampleVideoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
   },
   {
     id: 'm_1924_se_1',
@@ -202,7 +179,6 @@ export const MILESTONES_SEED: MilestoneReference[] = [
     ageMonthMin: 19,
     ageMonthMax: 24,
     description: 'Menolak dengan keras ("enggak mau") saat kesal, mulai menunjukkan sifat kepemilikan mainan ("punyaku").',
-    exampleVideoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
   },
 
   // 2 - 3 Tahun
@@ -212,7 +188,6 @@ export const MILESTONES_SEED: MilestoneReference[] = [
     ageMonthMin: 25,
     ageMonthMax: 36,
     description: 'Melompat dengan kedua kaki bersamaan di tempat, menaiki anak tangga sendiri dengan berpegangan.',
-    exampleVideoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
   },
   {
     id: 'm_2436_mh_1',
@@ -220,7 +195,6 @@ export const MILESTONES_SEED: MilestoneReference[] = [
     ageMonthMin: 25,
     ageMonthMax: 36,
     description: 'Membuka dan menutup tutup botol berulir, memegang pensil atau krayon di antara jari-jari.',
-    exampleVideoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
   },
   {
     id: 'm_2436_b_1',
@@ -228,7 +202,6 @@ export const MILESTONES_SEED: MilestoneReference[] = [
     ageMonthMin: 25,
     ageMonthMax: 36,
     description: 'Bisa menyebutkan nama lengkapnya jika ditanya, bertanya dengan awalan "apa", "siapa", atau "di mana".',
-    exampleVideoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
   },
   {
     id: 'm_2436_se_1',
@@ -236,7 +209,6 @@ export const MILESTONES_SEED: MilestoneReference[] = [
     ageMonthMin: 25,
     ageMonthMax: 36,
     description: 'Mulai melakukan roleplay (bermain pura-pura memasak, menyuapi boneka), mau berbagi mainan dengan pengawasan.',
-    exampleVideoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
   },
 
   // 3 - 5 Tahun
@@ -246,7 +218,6 @@ export const MILESTONES_SEED: MilestoneReference[] = [
     ageMonthMin: 37,
     ageMonthMax: 60,
     description: 'Berdiri satu kaki selama 3-5 detik, menangkap bola besar yang dilemparkan dari jarak 1,5 meter.',
-    exampleVideoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
   },
   {
     id: 'm_3660_mh_1',
@@ -254,7 +225,6 @@ export const MILESTONES_SEED: MilestoneReference[] = [
     ageMonthMin: 37,
     ageMonthMax: 60,
     description: 'Menggunting kertas mengikuti garis lurus, menggambar bentuk lingkaran yang cukup beraturan.',
-    exampleVideoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
   },
   {
     id: 'm_3660_b_1',
@@ -262,7 +232,6 @@ export const MILESTONES_SEED: MilestoneReference[] = [
     ageMonthMin: 37,
     ageMonthMax: 60,
     description: 'Bisa merangkai 4-5 kata menjadi cerita runut, memahami konsep preposisi (atas, bawah, dalam, luar).',
-    exampleVideoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
   },
   {
     id: 'm_3660_se_1',
@@ -270,7 +239,6 @@ export const MILESTONES_SEED: MilestoneReference[] = [
     ageMonthMin: 37,
     ageMonthMax: 60,
     description: 'Mandiri mencuci tangan sendiri, memakai pakaian berkancing dengan sedikit bantuan.',
-    exampleVideoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
   },
 
   // 5 - 7 Tahun
@@ -280,7 +248,6 @@ export const MILESTONES_SEED: MilestoneReference[] = [
     ageMonthMin: 61,
     ageMonthMax: 84,
     description: 'Bersepeda roda dua, melompat tali secara dinamis, melakukan gerakan engklek satu kaki melompati rintangan.',
-    exampleVideoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
   },
   {
     id: 'm_6084_mh_1',
@@ -288,7 +255,6 @@ export const MILESTONES_SEED: MilestoneReference[] = [
     ageMonthMin: 61,
     ageMonthMax: 84,
     description: 'Menulis huruf alfabet dasar dan angka 1-10, menggambar figur manusia yang memiliki 6 bagian tubuh jelas.',
-    exampleVideoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
   },
   {
     id: 'm_6084_b_1',
@@ -296,7 +262,6 @@ export const MILESTONES_SEED: MilestoneReference[] = [
     ageMonthMin: 61,
     ageMonthMax: 84,
     description: 'Mengucapkan kata dengan pelafalan R, S, L yang jelas, memahami lelucon sederhana, bercerita dongeng pendek.',
-    exampleVideoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
   },
   {
     id: 'm_6084_se_1',
@@ -304,7 +269,6 @@ export const MILESTONES_SEED: MilestoneReference[] = [
     ageMonthMin: 61,
     ageMonthMax: 84,
     description: 'Bermain kooperatif dalam kelompok besar dengan aturan (seperti petak umpet), mampu bernegosiasi dan menyelesaikan konflik sederhana.',
-    exampleVideoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ'
   }
 ];
 
@@ -366,7 +330,7 @@ export const ARTICLES_SEED: Article[] = [
     category: 'Sensori & Motorik',
     ageRange: '0 - 5 Tahun',
     body: `
-      <p class="mb-4">Apakah si Kecil seringkali menutup telinga dengan histeris saat mendengar suara blender atau blender, atau menolak keras menyentuh pasir, rumput basah, bahkan tidak mau makan makanan tertentu yang sedikit bertekstur (picky eater)?</p>
+      <p class="mb-4">Apakah si Kecil seringkali menutup telinga dengan histeris saat mendengar suara blender atau penyedot debu, atau menolak keras menyentuh pasir, rumput basah, bahkan tidak mau makan makanan tertentu yang sedikit bertekstur (picky eater)?</p>
       <h3 class="text-xl font-bold mt-6 mb-2">Apa itu Sensori Integrasi?</h3>
       <p class="mb-4">Sensori Integrasi (SI) adalah kemampuan sistem saraf pusat untuk menerima, menyaring, mengatur, dan memproses informasi dari indera kita (melihat, mendengar, menyentuh, mencium, merasakan, keseimbangan, serta posisi sendi) sehingga tubuh bisa merespons lingkungan secara adekuat.</p>
       <h3 class="text-xl font-bold mt-6 mb-2">Tanda Anak Mengalami Defisit Sensori</h3>
@@ -425,7 +389,7 @@ export const ARTICLES_SEED: Article[] = [
 export const ACTIVITIES_SEED: Activity[] = [
   {
     id: 'act_1',
-    title: ' Sensory Rice Bin (Mangkuk Beras Sensori)',
+    title: 'Sensory Rice Bin (Mangkuk Beras Sensori)',
     domain: 'Motorik Halus & Sensori',
     ageMonthMin: 6,
     ageMonthMax: 18,
@@ -435,7 +399,6 @@ export const ACTIVITIES_SEED: Activity[] = [
       'Sembunyikan mainan kecil (seperti hewan plastik, sendok, mangkuk kecil) di dalam tumpukan beras.',
       'Biarkan anak meraba, menggenggam, meraup, dan menuangkan beras memakai sendok ke mangkuk.'
     ],
-    videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
     rationale: 'Melatih kekuatan otot tangan, genggaman jemari, dan meredakan hipersensitivitas taktil anak terhadap tekstur kering kasar.',
     relatedScreeningResult: 'taktil_sensory'
   },
@@ -451,7 +414,6 @@ export const ACTIVITIES_SEED: Activity[] = [
       'Minta anak menebak hewan apa itu.',
       'Ajak anak menirukan kembali suara tersebut dan berikan pujian meriah saat ia mencoba bersuara.'
     ],
-    videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
     rationale: 'Merangsang kemampuan meniru suara (imitasi verbal), melatih fokus pendengaran, meningkatkan perbendaharaan kata, dan memperkuat bonding.',
     relatedScreeningResult: 'speech_delay'
   },
@@ -466,15 +428,101 @@ export const ACTIVITIES_SEED: Activity[] = [
       'Minta anak berjalan di atas lakban tersebut seperti meniti jembatan sempit, tumit menyentuh jempol kaki berikutnya.',
       'Tantang anak berjalan membawa sendok berisi bola plastik kecil tanpa jatuh.'
     ],
-    videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
     rationale: 'Melatih keseimbangan tubuh (indera vestibular), koordinasi motorik mata-kaki, serta fokus konsentrasi anak usia dini.',
     relatedScreeningResult: 'motorik_kasar'
+  },
+  {
+    id: 'act_4',
+    title: 'Tummy Time Bersama Mainan Berbunyi',
+    domain: 'Motorik Kasar',
+    ageMonthMin: 0,
+    ageMonthMax: 6,
+    steps: [
+      'Bentangkan matras atau selimut di lantai yang rata dan aman.',
+      'Telungkupkan bayi saat ia segar, bukan setelah menyusu.',
+      'Letakkan mainan berbunyi di depan wajahnya agar ia terdorong mengangkat kepala.',
+      'Mulai 1 sampai 3 menit, lalu tambah perlahan hingga total 15 menit sehari.'
+    ],
+    rationale: 'Menguatkan otot leher, bahu, dan punggung sebagai fondasi tengkurap, duduk, dan merangkak.',
+    relatedScreeningResult: 'motorik_kasar'
+  },
+  {
+    id: 'act_5',
+    title: 'Membaca Buku Bergambar Bersama',
+    domain: 'Bahasa & Kognitif',
+    ageMonthMin: 6,
+    ageMonthMax: 36,
+    steps: [
+      'Pilih buku bergambar dengan gambar besar dan warna kontras.',
+      'Pangku si Kecil dan tunjuk setiap gambar sambil menyebut namanya dengan jelas.',
+      'Beri jeda agar anak sempat menunjuk atau bersuara, lalu tanggapi dengan antusias.',
+      'Ulangi buku yang sama beberapa hari agar kosakatanya melekat.'
+    ],
+    rationale: 'Memperkaya kosakata, melatih atensi bersama, dan menumbuhkan kebiasaan membaca sejak dini.',
+    relatedScreeningResult: 'speech_delay'
+  },
+  {
+    id: 'act_6',
+    title: 'Menara Balok Warna',
+    domain: 'Motorik Halus',
+    ageMonthMin: 12,
+    ageMonthMax: 36,
+    steps: [
+      'Siapkan 4 sampai 6 balok kayu atau gelas plastik yang mudah digenggam.',
+      'Contohkan cara menumpuk dua balok, lalu ajak anak menirukan.',
+      'Tambah satu balok setiap kali berhasil dan rayakan saat menara roboh bersama.',
+      'Sebutkan warna setiap balok untuk sekaligus melatih bahasa.'
+    ],
+    rationale: 'Melatih koordinasi mata dan tangan, kekuatan jari, serta kesabaran.',
+    relatedScreeningResult: 'motorik_halus'
+  },
+  {
+    id: 'act_7',
+    title: 'Bermain Peran Dokter Kecil',
+    domain: 'Sosial Emosional',
+    ageMonthMin: 36,
+    ageMonthMax: 84,
+    steps: [
+      'Siapkan boneka dan peralatan dokter mainan atau benda di rumah.',
+      'Ajak anak bergantian menjadi dokter dan pasien.',
+      'Tanyakan perasaan boneka, misalnya "Kenapa bonekanya sedih?"',
+      'Tutup permainan dengan berterima kasih kepada dokter kecil.'
+    ],
+    rationale: 'Melatih empati, kemampuan bercerita, dan mengurangi kecemasan saat periksa ke dokter.',
+    relatedScreeningResult: 'sosial_emosional'
+  },
+  {
+    id: 'act_8',
+    title: 'Meronce Manik Besar',
+    domain: 'Motorik Halus & Konsentrasi',
+    ageMonthMin: 36,
+    ageMonthMax: 84,
+    steps: [
+      'Siapkan tali sepatu atau benang tebal dan manik berukuran besar.',
+      'Ikat salah satu ujung tali agar manik tidak terlepas.',
+      'Minta anak memasukkan manik satu per satu mengikuti pola warna sederhana.',
+      'Tingkatkan tantangan dengan pola yang lebih panjang.'
+    ],
+    rationale: 'Melatih genggaman pinset, koordinasi bilateral, dan konsentrasi sebagai bekal menulis.',
+    relatedScreeningResult: 'motorik_halus'
   }
 ];
 
-export const CLINICAL_EXPERTS = [
-  { id: 'exp_ira', name: 'Ira Amanda, M.Psi., Psikolog', role: 'Psikolog Anak & Terapi Perilaku', clinic: 'Klinik FlourishCare Tebet, Jakarta Selatan', photoUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=200&auto=format&fit=crop' },
-  { id: 'exp_rian', name: 'Rian Hidayat, A.Md.OT', role: 'Terapis Okupasi (OT) & Sensori Integrasi', clinic: 'Klinik FlourishCare Tebet & Home Visit', photoUrl: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?q=80&w=200&auto=format&fit=crop' },
-  { id: 'exp_siti', name: 'Siti Sarah, M.Psi., Psikolog', role: 'Psikolog Tumbuh Kembang & Asesmen Autisme', clinic: 'Klinik FlourishCare Bintaro, Tangerang Selatan', photoUrl: 'https://images.unsplash.com/photo-1594744803329-e58b31de215f?q=80&w=200&auto=format&fit=crop' },
-  { id: 'exp_dina', name: 'Dina Lestari, A.Md.TW', role: 'Terapis Wicara (Speech Therapist)', clinic: 'Klinik FlourishCare Tebet & Telekonsultasi', photoUrl: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?q=80&w=200&auto=format&fit=crop' }
+export interface ClinicalExpert {
+  id: string;
+  name: string;
+  role: string;
+  clinic: string;
+  photoUrl: string;
+  rating: number;
+  years: number;
+  /** Service codes this expert handles (see data/pricing.ts) */
+  services: string[];
+}
+
+export const CLINICAL_EXPERTS: ClinicalExpert[] = [
+  { id: 'exp_ira', name: 'Ira Amanda, M.Psi., Psikolog', role: 'Psikolog anak dan terapi perilaku', clinic: 'Klinik FlourishCare Tebet', photoUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=200&auto=format&fit=crop', rating: 4.9, years: 9, services: ['BT', 'KONSUL', 'EVAL', 'IQ', 'SCHOOL', 'DIAG'] },
+  { id: 'exp_rian', name: 'Rian Hidayat, A.Md.OT', role: 'Terapis okupasi dan sensori integrasi', clinic: 'Klinik Tebet dan home visit', photoUrl: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?q=80&w=200&auto=format&fit=crop', rating: 4.8, years: 7, services: ['SI', 'OT'] },
+  { id: 'exp_siti', name: 'Siti Sarah, M.Psi., Psikolog', role: 'Psikolog tumbuh kembang dan asesmen autisme', clinic: 'Klinik FlourishCare Bintaro', photoUrl: 'https://images.unsplash.com/photo-1594744803329-e58b31de215f?q=80&w=200&auto=format&fit=crop', rating: 4.9, years: 11, services: ['KONSUL', 'EVAL', 'IQ', 'SCHOOL', 'DIAG'] },
+  { id: 'exp_dina', name: 'Dina Lestari, A.Md.TW', role: 'Terapis wicara', clinic: 'Klinik Tebet dan home visit', photoUrl: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?q=80&w=200&auto=format&fit=crop', rating: 4.8, years: 6, services: ['TW'] }
 ];

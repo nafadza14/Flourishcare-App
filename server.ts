@@ -19,6 +19,20 @@ import {
   Notification, 
   NotificationPreferences 
 } from './src/types';
+import { calculatePrice, isTherapyCategory, type ServiceCategory, type PackageSize } from './src/data/pricing';
+
+/** Keep AI and server copy free of em dashes (house style). */
+function stripEmDash(text: string): string {
+  return (text || '')
+    .replace(/\s*\u2014\s*/g, ', ')
+    .replace(/\s+\u2013\s+/g, ', ')
+    .replace(/,\s*,/g, ',');
+}
+
+/** Collision-safe ids for records created in quick succession. */
+function uid(prefix: string): string {
+  return `${prefix}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+}
 
 // Initialize Supabase Client safely with provided details
 const rawSupabaseUrl = process.env.SUPABASE_URL || 'https://vtquhqdfyirccxdzmpyr.supabase.co';
@@ -26,7 +40,35 @@ const rawSupabaseUrl = process.env.SUPABASE_URL || 'https://vtquhqdfyirccxdzmpyr
 const SUPABASE_URL = rawSupabaseUrl.replace(/\/rest\/v1\/?$/, '');
 const SUPABASE_KEY = process.env.SUPABASE_KEY || 'sb_publishable_rV4ay28GgXdI3TgnY3jkJA_YIVVJAKS';
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+/**
+ * Circuit breaker around Supabase network calls. When the database host is
+ * unreachable, every request would otherwise wait for the network timeout
+ * before falling back to memory. After one network failure we skip Supabase
+ * for a short window so the app stays fast, then try again.
+ */
+const SUPABASE_TIMEOUT_MS = 8000;
+const SUPABASE_RETRY_AFTER_MS = 30000;
+let supabaseOfflineUntil = 0;
+const supabaseFetch: typeof fetch = async (input, init) => {
+  if (Date.now() < supabaseOfflineUntil) {
+    // Named AbortError so the Supabase client fails fast instead of retrying with backoff.
+    const offline = new Error('Supabase offline, using memory until the retry window passes');
+    offline.name = 'AbortError';
+    throw offline;
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), SUPABASE_TIMEOUT_MS);
+  try {
+    return await fetch(input, { ...init, signal: init?.signal ?? controller.signal });
+  } catch (err) {
+    supabaseOfflineUntil = Date.now() + SUPABASE_RETRY_AFTER_MS;
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, { global: { fetch: supabaseFetch } });
 
 function isTableMissingError(err: any): boolean {
   if (!err) return false;
@@ -53,7 +95,7 @@ if (process.env.GEMINI_API_KEY) {
 const app = express();
 app.use(express.json());
 
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
   // ==========================================
   // IN-MEMORY PERSISTENT STORE (PRE-SEEDED)
@@ -998,7 +1040,7 @@ const PORT = 3000;
 
       // Seed automatic welcome notification
       const welcomeNotification: Notification = {
-        id: 'n_welcome_' + Date.now(),
+        id: uid('n_welcome_'),
         parentId: userId,
         type: 'weekly_digest',
         title: `Selamat Datang, ${fullName.split(' ')[0]}!`,
@@ -1073,7 +1115,7 @@ const PORT = 3000;
     const userId = getUserId(req);
     try {
       const newChild: Child = {
-        id: 'c_' + Date.now(),
+        id: uid('c_'),
         parentId: userId,
         name: req.body.name || 'Si Kecil',
         birthDate: req.body.birthDate || new Date().toISOString().split('T')[0],
@@ -1088,7 +1130,7 @@ const PORT = 3000;
     } catch (err: any) {
       console.error('Crash in POST /api/children:', err);
       const fallbackChild: Child = {
-        id: 'c_fallback_' + Date.now(),
+        id: uid('c_fallback_'),
         parentId: userId,
         name: req.body.name || 'Si Kecil',
         birthDate: req.body.birthDate || new Date().toISOString().split('T')[0],
@@ -1131,7 +1173,7 @@ const PORT = 3000;
 
   app.post('/api/growth', async (req: Request, res: Response) => {
     const record: GrowthRecord = {
-      id: 'g_' + Date.now(),
+      id: uid('g_'),
       childId: req.body.childId,
       date: req.body.date,
       weightKg: Number(req.body.weightKg),
@@ -1179,7 +1221,7 @@ const PORT = 3000;
       }
     } else if (achieved) {
       const newCheck: ChildMilestone = {
-        id: 'cm_' + Date.now(),
+        id: uid('cm_'),
         childId,
         milestoneId,
         achieved: true,
@@ -1223,7 +1265,7 @@ const PORT = 3000;
       }
     } else if (givenDate) {
       const newImm: ChildImmunization = {
-        id: 'ci_' + Date.now(),
+        id: uid('ci_'),
         childId,
         immunizationId,
         givenDate,
@@ -1248,7 +1290,7 @@ const PORT = 3000;
     const userId = getUserId(req);
     const activeProf = await getProfile(userId);
     const screening: Screening = {
-      id: 's_' + Date.now(),
+      id: uid('s_'),
       childId: req.body.childId,
       type: req.body.type,
       ageMonthAtTest: Number(req.body.ageMonthAtTest),
@@ -1263,12 +1305,15 @@ const PORT = 3000;
 
     // Create a notification for red flag or alert
     if (screening.result.includes('risiko_tinggi') || screening.result === 'penyimpangan' || screening.result === 'risiko_sedang' || screening.result === 'meragukan') {
+      const kids = await getChildren(activeProf.id);
+      const childName = kids.find(c => c.id === screening.childId)?.name || 'si Kecil';
+      const typeLabel = screening.type === 'mchat_r' ? 'M-CHAT-R' : screening.type === 'speech_delay' ? 'bicara' : 'KPSP';
       const newNotif: Notification = {
-        id: 'n_' + Date.now(),
+        id: uid('n_'),
         parentId: activeProf.id,
         type: 'screening',
-        title: `Peringatan Skrining: ${screening.type.toUpperCase()}`,
-        body: `Hasil skrining ${screening.type.toUpperCase()} Aiden menunjukkan indikasi ${screening.result.replace('_', ' ')}. Silakan tinjau rekomendasi terapi & konsultasi psikolog kami.`,
+        title: `Hasil skrining ${typeLabel} ${childName}`,
+        body: `Hasil skrining menunjukkan ${screening.result.replace('_', ' ')}. Lihat rekomendasi dan pilihan konsultasi bersama psikolog kami.`,
         deepLink: 'screenings',
         read: false,
         createdAt: new Date().toISOString()
@@ -1307,17 +1352,23 @@ const PORT = 3000;
     if (monthlyCount >= 3) {
       return res.status(400).json({ 
         error: 'Limit Tercapai', 
-        message: 'Anda telah mencapai batas 3 pertanyaan gratis bulan ini. Pilihan konsultasi langsung di klinik FlourishCare selalu terbuka untuk Anda!' 
+        message: 'Kuota 3 pertanyaan gratis bulan ini sudah terpakai. Konsultasi langsung di klinik FlourishCare tetap bisa dipesan kapan saja.' 
       });
     }
 
+    const questionText = String(req.body.questionText ?? req.body.content ?? '').trim();
+    if (questionText.length < 15) {
+      return res.status(400).json({ error: 'Pertanyaan terlalu singkat', message: 'Tulis minimal 15 karakter agar ahli bisa memahami kondisinya.' });
+    }
+
     const newQuestion: Question = {
-      id: 'q_' + Date.now(),
+      id: uid('q_'),
       parentId,
       childId: req.body.childId || null,
-      questionText: req.body.questionText,
+      questionText: questionText.slice(0, 1000),
       status: 'pending',
       isPublic: req.body.isPublic ?? true,
+      category: typeof req.body.category === 'string' ? req.body.category : undefined,
       createdAt: new Date().toISOString()
     };
     await saveQuestion(newQuestion);
@@ -1337,7 +1388,8 @@ Tugas Anda adalah menulis jawaban yang:
 4. Berikan 2-3 tips stimulasi praktis yang bisa dilakukan orang tua di rumah secara mandiri.
 5. Arahkan dengan lembut di bagian akhir untuk melakukan booking konsultasi dengan psikolog atau terapis okupasi/wicara FlourishCare untuk pemeriksaan diagnostik komprehensif.
 
-Gunakan bahasa Indonesia yang santun, runtut, dan terstruktur rapi dengan paragraf-paragraf yang enak dibaca.`;
+Gunakan bahasa Indonesia yang santun, runtut, dan terstruktur rapi dengan paragraf-paragraf yang enak dibaca.
+Jangan gunakan tanda em dash atau tanda pisah panjang. Gunakan koma atau titik sebagai gantinya.`;
 
           const response = await ai.models.generateContent({
             model: 'gemini-3.5-flash',
@@ -1348,7 +1400,7 @@ Gunakan bahasa Indonesia yang santun, runtut, dan terstruktur rapi dengan paragr
             }
           });
 
-          expertAnswer = response.text || '';
+          expertAnswer = stripEmDash(response.text || '');
         }
 
         // Fallback if AI fails or key is missing
@@ -1371,11 +1423,11 @@ Gunakan bahasa Indonesia yang santun, runtut, dan terstruktur rapi dengan paragr
 
           // Add in-app notification
           const newNotif: Notification = {
-            id: 'n_' + Date.now(),
-            parentId: activeProf.id,
+            id: uid('n_'),
+            parentId: parentId,
             type: 'q_and_a',
-            title: 'Tanya Ahli Terjawab!',
-            body: `Pertanyaan Anda mengenai tumbuh kembang anak telah dijawab oleh Ira Amanda, M.Psi., Psikolog.`,
+            title: 'Tanya Ahli terjawab',
+            body: `Pertanyaan Anda soal tumbuh kembang si Kecil sudah dijawab oleh Ira Amanda, M.Psi., Psikolog.`,
             deepLink: 'experts',
             read: false,
             createdAt: new Date().toISOString()
@@ -1405,7 +1457,8 @@ Gunakan bahasa Indonesia yang santun, runtut, dan terstruktur rapi dengan paragr
 Tuliskan draf jawaban klinis untuk pertanyaan orang tua berikut:
 "${q.questionText}"
 
-Draf jawaban harus sangat hangat, empatik, kredibel secara medis/psikologis, memuat 2 tips stimulasi mandiri di rumah, dan merekomendasikan konsultasi langsung ke terapis/psikolog di Klinik Tebet atau Telekonsultasi jika dibutuhkan.`;
+Draf jawaban harus sangat hangat, empatik, kredibel secara medis/psikologis, memuat 2 tips stimulasi mandiri di rumah, dan merekomendasikan konsultasi langsung ke terapis/psikolog di Klinik Tebet jika dibutuhkan.
+Jangan gunakan tanda em dash atau tanda pisah panjang.`;
 
         const response = await ai.models.generateContent({
           model: 'gemini-3.5-flash',
@@ -1414,7 +1467,7 @@ Draf jawaban harus sangat hangat, empatik, kredibel secara medis/psikologis, mem
             temperature: 0.6
           }
         });
-        draftText = response.text || '';
+        draftText = stripEmDash(response.text || '');
       }
 
       if (!draftText) {
@@ -1438,7 +1491,7 @@ Draf jawaban harus sangat hangat, empatik, kredibel secara medis/psikologis, mem
       const updatedQ = {
         ...qList[index],
         status: 'answered' as const,
-        answerText,
+        answerText: stripEmDash(String(answerText || '')),
         answeredBy: expertId === 'exp_ira' ? 'Ira Amanda, M.Psi., Psikolog' : 'Rian Hidayat, A.Md.OT',
         answeredAt: new Date().toISOString()
       };
@@ -1446,11 +1499,11 @@ Draf jawaban harus sangat hangat, empatik, kredibel secara medis/psikologis, mem
 
       // Notify
       const newNotif: Notification = {
-        id: 'n_' + Date.now(),
-        parentId: activeProf.id,
+        id: uid('n_'),
+        parentId: updatedQ.parentId || activeProf.id,
         type: 'q_and_a',
-        title: 'Tanya Ahli Terjawab!',
-        body: `Pertanyaan Anda telah dijawab langsung oleh psikolog anak kami.`,
+        title: 'Tanya Ahli terjawab',
+        body: `Pertanyaan Anda sudah dijawab langsung oleh psikolog anak kami.`,
         deepLink: 'experts',
         read: false,
         createdAt: new Date().toISOString()
@@ -1472,42 +1525,59 @@ Draf jawaban harus sangat hangat, empatik, kredibel secara medis/psikologis, mem
 
   app.post('/api/bookings', async (req: Request, res: Response) => {
     const userId = getUserId(req);
-    const code = 'FC-' + req.body.serviceType.toUpperCase().substring(0,2) + '-' + Math.floor(1000 + Math.random() * 9000);
-    const amountMap: Record<string, number> = {
-      'onsite': 250000,
-      'home_visit': 350000,
-      'psikolog': 300000,
-      'psikotes': 450000,
-      'teleconsultation': 150000
-    };
+    const body = req.body || {};
+    const legacyMap: Record<string, ServiceCategory> = { telekonsultasi: 'psikolog', teleconsultation: 'psikolog', home: 'home_visit' };
+    const category = (legacyMap[body.serviceType] || body.serviceType || 'onsite') as ServiceCategory;
+    if (!['onsite', 'home_visit', 'psikolog', 'psikotes'].includes(category)) {
+      return res.status(400).json({ error: 'Tipe layanan tidak dikenal.' });
+    }
+    if (!body.childId || !body.scheduledAt) {
+      return res.status(400).json({ error: 'Data booking belum lengkap.' });
+    }
+    if (category === 'home_visit' && !String(body.address || '').trim()) {
+      return res.status(400).json({ error: 'Alamat wajib diisi untuk home visit.' });
+    }
+
+    const defaultCode = isTherapyCategory(category) ? 'SI' : category === 'psikotes' ? 'IQ' : 'KONSUL';
+    // Amount is always computed on the server from the shared price list
+    const amount = calculatePrice({
+      category,
+      subCode: String(body.subCode || defaultCode),
+      packageSessions: Number(body.packageSessions) as PackageSize,
+      weekend: !!body.isWeekend,
+      atHome: !!body.atHome,
+    });
+    const prefix = { onsite: 'ON', home_visit: 'HV', psikolog: 'PS', psikotes: 'PT' }[category];
+    const code = `FC-${prefix}-${Math.floor(1000 + Math.random() * 9000)}`;
 
     const newBooking: Booking = {
-      id: 'b_' + Date.now(),
+      id: uid('b_'),
       parentId: userId,
-      childId: req.body.childId,
-      serviceType: req.body.serviceType,
-      subService: req.body.subService,
-      packageName: req.body.packageName || 'Sesi Tunggal (Evaluasi/Asesmen)',
-      therapistId: req.body.therapistId || null,
-      therapistName: req.body.therapistName || 'Terapis Jadwal Terbaik',
-      scheduledAt: req.body.scheduledAt,
+      childId: body.childId,
+      serviceType: category as any,
+      subService: body.subService || 'Layanan FlourishCare',
+      packageName: body.packageName || 'Sesi tunggal',
+      therapistId: body.therapistId || undefined,
+      therapistName: body.therapistName || 'Terapis FlourishCare',
+      scheduledAt: body.scheduledAt,
       status: 'pending',
-      amount: amountMap[req.body.serviceType] || 250000,
+      amount,
       paymentStatus: 'unpaid',
       midtransOrderId: 'FC-' + Date.now(),
       bookingCode: code,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      address: body.address ? String(body.address).slice(0, 300) : undefined,
+      paymentMethod: body.paymentMethod ? String(body.paymentMethod) : undefined,
     };
 
     await saveBooking(newBooking);
 
-    // Create a pending booking notification
     const newNotif: Notification = {
-      id: 'n_' + Date.now(),
+      id: uid('n_'),
       parentId: userId,
       type: 'booking',
-      title: 'Booking Berhasil Dibuat',
-      body: `Booking ${newBooking.subService} untuk anak Anda telah dibuat. Selesaikan pembayaran DP/Lunas untuk konfirmasi jadwal. Kode: ${newBooking.bookingCode}`,
+      title: 'Booking dibuat',
+      body: `Booking ${newBooking.subService} berhasil dibuat dengan kode ${newBooking.bookingCode}. Selesaikan pembayaran untuk mengonfirmasi jadwal.`,
       deepLink: 'bookings',
       read: false,
       createdAt: new Date().toISOString()
@@ -1532,11 +1602,11 @@ Draf jawaban harus sangat hangat, empatik, kredibel secara medis/psikologis, mem
       
       // Notify payment successful
       const newNotif: Notification = {
-        id: 'n_' + Date.now(),
+        id: uid('n_'),
         parentId: userId,
         type: 'booking',
-        title: 'Pembayaran Dikonfirmasi!',
-        body: `Pembayaran Rp ${updated.amount.toLocaleString('id-ID')} untuk booking ${updated.subService} telah diverifikasi. Sampai jumpa di klinik!`,
+        title: 'Pembayaran dikonfirmasi',
+        body: `Pembayaran untuk booking ${updated.subService} (${updated.bookingCode}) sudah diverifikasi. Sampai jumpa di sesi nanti.`,
         deepLink: 'bookings',
         read: false,
         createdAt: new Date().toISOString()
@@ -1598,7 +1668,9 @@ Draf jawaban harus sangat hangat, empatik, kredibel secara medis/psikologis, mem
   // ==========================================
   
   async function startLocalServer() {
-    if (process.env.NODE_ENV !== 'production') {
+    // The bundled build (dist/server.cjs) always serves the compiled app, even without NODE_ENV set
+    const isProduction = process.env.NODE_ENV === 'production' || (process.argv[1] || '').endsWith('server.cjs');
+    if (!isProduction) {
       const vite = await createViteServer({
         server: { middlewareMode: true },
         appType: 'spa',
@@ -1606,6 +1678,8 @@ Draf jawaban harus sangat hangat, empatik, kredibel secara medis/psikologis, mem
       app.use(vite.middlewares);
     } else {
       const distPath = path.join(process.cwd(), 'dist');
+      // Hashed build assets never change, cache them for a year
+      app.use('/assets', express.static(path.join(distPath, 'assets'), { immutable: true, maxAge: '1y' }));
       app.use(express.static(distPath));
       app.get('*', (req: Request, res: Response) => {
         res.sendFile(path.join(distPath, 'index.html'));

@@ -143,6 +143,7 @@ export interface Question {
   answerText?: string;
   answeredBy?: string;
   isPublic: boolean;
+  category?: string;
   createdAt: string;
   answeredAt?: string;
 }
@@ -166,12 +167,15 @@ export interface Booking {
   midtransOrderId: string;
   bookingCode: string;
   createdAt: string;
+  /** Optional booking details captured by the 6-step flow */
+  address?: string;
+  paymentMethod?: string;
 }
 
 export interface Notification {
   id: string;
   parentId: string;
-  type: 'immunization' | 'milestone' | 'screening' | 'booking' | 'q_and_a' | 'weekly_digest';
+  type: 'immunization' | 'milestone' | 'screening' | 'booking' | 'q_and_a' | 'weekly_digest' | 'system';
   title: string;
   body: string;
   deepLink?: string;

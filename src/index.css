@@ -1,93 +1,249 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap');
+@import "@fontsource-variable/outfit";
 @import "tailwindcss";
 
+/*
+  FlourishCare iOS design tokens
+  Palette: FlourishCare orange + amber, warm ink derived from cocoa, peach canvas.
+  Type: Outfit (geometric, light weights) to match the reference.
+*/
 @theme {
-  --font-sans: "Inter", "SF Pro Display", "Roboto", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-display: "Plus Jakarta Sans", var(--font-sans);
-  --font-serif: "Playfair Display", Georgia, serif;
+  --font-sans: "Outfit Variable", "Outfit", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  --font-display: "Outfit Variable", "Outfit", -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
 
+  /* Brand */
   --color-brand-orange: #F29935;
+  --color-brand-orange-deep: #E5801F;
+  --color-brand-orange-soft: #FFF1E2;
+  --color-brand-orange-tint: #FFF7EE;
   --color-brand-yellow: #F5BB3E;
   --color-brand-brown: #7A4C3D;
   --color-brand-cream: #FFFDE9;
-  
-  --color-semantic-success: #5B9A6B; /* Sage green as requested */
-  --color-semantic-warning: #F5BB3E;
-  --color-semantic-danger: #D96A4A; /* Clay red instead of neon red */
 
-  --animate-fade-in-up: fade-in-up 0.4s ease-out;
+  /* Neutrals (warm) */
+  --color-ink: #231B16;
+  --color-ink-2: #4A3F38;
+  --color-mute: #8E837B;
+  --color-faint: #B9AEA6;
+  --color-line: #F0E7DE;
+  --color-line-2: #E7DCD1;
+  --color-fill: #F7F1EB;
+  --color-canvas: #FFFAF5;
+  --color-peach: #FBE2C8;
+  --color-card: #FFFFFF;
+
+  /* Semantic */
+  --color-semantic-success: #4F9A68;
+  --color-semantic-success-soft: #E9F5EC;
+  --color-semantic-warning: #E3A12B;
+  --color-semantic-warning-soft: #FFF5DD;
+  --color-semantic-danger: #D9634A;
+  --color-semantic-danger-soft: #FDECE7;
+  --color-rose-band: #FBDADA;
+  --color-rose-line: #EE8FA6;
+
+  --radius-card: 22px;
+  --radius-sheet: 28px;
+
+  --ease-ios: cubic-bezier(0.32, 0.72, 0, 1);
+  --animate-shimmer: shimmer 1.4s ease-in-out infinite;
+  --animate-float: float 4s ease-in-out infinite;
 }
 
-@keyframes fade-in-up {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  20% { transform: rotate(-10deg); }
+  40% { transform: rotate(8deg); }
+  60% { transform: rotate(-4deg); }
+  80% { transform: rotate(2deg); }
+}
+
+@keyframes blink {
+  0%, 92%, 100% { transform: scaleY(1); }
+  95% { transform: scaleY(0.1); }
+}
+
+@keyframes ray-breathe {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.07); opacity: 0.85; }
+}
+
+@keyframes pulse-dot {
+  0% { box-shadow: 0 0 0 0 rgba(242, 153, 53, 0.55); }
+  70% { box-shadow: 0 0 0 7px rgba(242, 153, 53, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(242, 153, 53, 0); }
+}
+
+/* ---------- Base ----------
+   Layered so Tailwind utilities (text-white, text-[15px], etc.) always win. */
+@layer base {
+  html, body, #root {
+    height: 100%;
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
+
+  body {
+    margin: 0;
+    background-color: var(--color-peach);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+    text-rendering: optimizeLegibility;
+    /* App-like: no accidental text selection while tapping or swiping */
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  input, textarea, [contenteditable], .selectable, .prose-fc {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    margin: 0;
+  }
+
+  button {
+    font: inherit;
+    color: inherit;
+    -webkit-tap-highlight-color: transparent;
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  input, textarea, select {
+    font: inherit;
+    color: inherit;
+  }
+
+  /* iOS: inputs below 16px trigger zoom, keep 16px minimum */
+  input, textarea, select {
+    font-size: 16px;
+  }
+
+  input:focus, select:focus, textarea:focus {
+    outline: none;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-brand-orange);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: rgba(242, 153, 53, 0.25);
   }
 }
 
-/* Custom Cocoa-Tinted Shadows for Warm Premium Feel */
-.shadow-cocoa-resting {
-  box-shadow: 0 1px 2px rgba(122, 76, 61, 0.06), 0 1px 3px rgba(122, 76, 61, 0.05);
+/* ---------- Components and helpers ---------- */
+@layer components {
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+  .tabular { font-variant-numeric: tabular-nums; }
+
+  .hairline-b { box-shadow: inset 0 -0.5px 0 rgba(35, 27, 22, 0.12); }
+  .hairline-t { box-shadow: inset 0 0.5px 0 rgba(35, 27, 22, 0.12); }
+
+  /* Soft iOS card elevation, warm tinted */
+  .shadow-card {
+    box-shadow: 0 1px 2px rgba(91, 58, 30, 0.04), 0 6px 18px rgba(91, 58, 30, 0.05);
+  }
+  .shadow-raised {
+    box-shadow: 0 2px 4px rgba(91, 58, 30, 0.05), 0 12px 28px rgba(91, 58, 30, 0.08);
+  }
+  .shadow-float {
+    box-shadow: 0 4px 10px rgba(91, 58, 30, 0.06), 0 18px 40px rgba(91, 58, 30, 0.14);
+  }
+  .shadow-orange {
+    box-shadow: 0 6px 16px rgba(229, 128, 31, 0.28), 0 1px 2px rgba(229, 128, 31, 0.2);
+  }
+
+  .bg-orange-gradient {
+    background-image: linear-gradient(150deg, #F6AA55 0%, #F29935 45%, #E5801F 100%);
+  }
+
+  .bg-canvas-gradient {
+    background-image: linear-gradient(180deg, #FFF4E8 0%, #FFFAF5 38%, #FFFAF5 100%);
+  }
+
+  .glass {
+    background-color: rgba(255, 250, 245, 0.86);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+  }
+
+  .glass-white {
+    background-color: rgba(255, 255, 255, 0.86);
+    -webkit-backdrop-filter: saturate(180%) blur(24px);
+    backdrop-filter: saturate(180%) blur(24px);
+  }
+
+  .skeleton {
+    background: linear-gradient(90deg, #F4ECE4 25%, #FBF5EF 37%, #F4ECE4 63%);
+    background-size: 400% 100%;
+    animation: var(--animate-shimmer);
+    border-radius: 12px;
+  }
+
+  .anim-wiggle { animation: wiggle 2.4s ease-in-out 0.6s infinite; transform-origin: 70% 80%; display: inline-block; }
+  .anim-float { animation: var(--animate-float); }
+  .anim-blink { animation: blink 4.5s infinite; transform-origin: center; transform-box: fill-box; }
+  .anim-rays { animation: ray-breathe 3.2s ease-in-out infinite; transform-origin: 50px 56px; transform-box: view-box; }
+  .anim-pulse-dot { animation: pulse-dot 2s infinite; }
+
+  .safe-top { padding-top: env(safe-area-inset-top); }
+  .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+
+  /* Safe areas: real device insets on phones, simulated insets inside the desktop frame */
+  .phone {
+    --sat: max(env(safe-area-inset-top), 12px);
+    --sab: max(env(safe-area-inset-bottom), 12px);
+  }
+  @media (min-width: 768px) {
+    .phone {
+      --sat: 50px;
+      --sab: 22px;
+    }
+  }
+
+  /* Article body typography */
+  .prose-fc { color: var(--color-ink-2); font-size: 17px; line-height: 1.65; }
+  .prose-fc p { margin: 0 0 14px; }
+  .prose-fc h3 { font-size: 20px; font-weight: 500; color: var(--color-ink); margin: 26px 0 10px; letter-spacing: -0.01em; }
+  .prose-fc ul, .prose-fc ol { margin: 0 0 16px; padding-left: 20px; }
+  .prose-fc ul { list-style: disc; }
+  .prose-fc ol { list-style: decimal; }
+  .prose-fc li { margin-bottom: 8px; padding-left: 2px; }
+  .prose-fc strong { color: var(--color-ink); font-weight: 600; }
+  .prose-fc em { font-style: italic; }
+
+  /* Native date input tidy up */
+  input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.55; cursor: pointer; }
 }
 
-.shadow-cocoa-raised {
-  box-shadow: 0 4px 14px rgba(122, 76, 61, 0.09);
+@media (prefers-reduced-motion: reduce) {
+  .anim-wiggle, .anim-float, .anim-blink, .anim-rays, .anim-pulse-dot, .skeleton { animation: none !important; }
 }
 
-.shadow-cocoa-floating {
-  box-shadow: 0 10px 28px rgba(122, 76, 61, 0.14);
-}
-
-/* Base resets & typography */
-body {
-  background-color: #FFFDF0;
-  color: #5C433A;
-  font-family: var(--font-sans);
-  -webkit-font-smoothing: antialiased;
-  overscroll-behavior-y: contain; /* Prevents bounce scroll on mobile browsers */
-}
-
-h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-display);
-  font-weight: 700;
-  color: var(--color-brand-brown);
-}
-
-/* Custom scrollbar to keep layout clean */
-::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: #EEDCC5;
-  border-radius: 10px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #D9C3A5;
-}
-
-/* Base interactive transitions */
-button, select, input, textarea, a {
-  transition: all 0.2s cubic-bezier(0.22, 0.61, 0.36, 1);
-}
-
-/* PWA mobile app specific behaviors */
-input:focus, select:focus, textarea:focus {
-  outline: none;
-}
-
-/* Keep layouts safe from horizontal scrolling */
-.scrollbar-none::-webkit-scrollbar {
-  display: none;
-}
-.scrollbar-none {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+@media print {
+  body { background: #fff !important; }
+  .no-print { display: none !important; }
 }

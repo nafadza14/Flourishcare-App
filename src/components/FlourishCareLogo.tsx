@@ -3,11 +3,14 @@ import React from 'react';
 interface FlourishCareLogoProps {
   className?: string;
   variant?: 'light' | 'dark' | 'color';
+  /** Slowly rotate the sun rays */
+  animated?: boolean;
 }
 
 export const FlourishCareLogo: React.FC<FlourishCareLogoProps> = ({
   className = 'w-10 h-10',
-  variant = 'color'
+  variant = 'color',
+  animated = false
 }) => {
   // Brand Colors
   const orangeColor = '#F29935';
@@ -27,8 +30,11 @@ export const FlourishCareLogo: React.FC<FlourishCareLogoProps> = ({
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
+      role="img"
+      aria-label="Logo FlourishCare"
     >
       {/* 1. Sunrays (Pill shapes radiating outwards) */}
+      <g className={animated ? 'anim-rays' : undefined}>
       {/* Top (12 o'clock) */}
       <rect x="47" y="6" width="6" height="11" rx="3" fill={sunrayColor} />
       {/* Top-Right (2 o'clock) */}
@@ -43,6 +49,7 @@ export const FlourishCareLogo: React.FC<FlourishCareLogoProps> = ({
       <rect x="6" y="47" width="11" height="6" rx="3" fill={sunrayColor} />
       {/* Top-Left (10 o'clock) */}
       <rect x="20" y="17" width="6" height="11" rx="3" transform="rotate(-45 23 22.5)" fill={sunrayColor} />
+      </g>
 
       {/* 2. Outer Sun Crescent (Big Orange Arch with rounded ends) */}
       <path
